@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f7f9;
+  --card: #ffffff;
+  --card-secondary: #f1f3f6;
+  --foreground: #16181d;
+  --muted: #6e7380;
+  --accent: #b4535b;
+  --accent-soft: #f5e9ea;
+  --border: #dde1e8;
+  --success: #3a8457;
+  --warning: #c4892b;
+  --danger: #c24444;
+}
+
+html[data-theme="dark"] {
+  --background: #0f1218;
+  --card: #171b23;
+  --card-secondary: #202631;
+  --foreground: #f3f5f9;
+  --muted: #9aa3b3;
+  --accent: #d16b73;
+  --accent-soft: #3d2528;
+  --border: #2e3746;
+  --success: #4b9c67;
+  --warning: #d6a545;
+  --danger: #da5959;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-secondary: var(--card-secondary);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.chip {
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  color: var(--foreground);
+  border-radius: 9999px;
+  padding: 0.27rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 7px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
 }

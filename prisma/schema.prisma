@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  MANAGER
+  OPERATOR
+}
+
+enum ReservationSource {
+  FLEETEE_A
+  FLEETEE_B
+  GETAROUND
+  TURO
+  OTHER
+}
+
+enum DispatchStatus {
+  TODO
+  ASSIGNED
+  DONE
+}
+
+model Agency {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String
+  city         String
+  vehicles     Vehicle[]
+  users        User[]
+  reservations Reservation[]
+  dispatches   Dispatch[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String?
+  firstName    String
+  lastName     String
+  role         UserRole
+  isActive     Boolean      @default(true)
+  agencyId     String
+  agency       Agency       @relation(fields: [agencyId], references: [id])
+  dispatches   Dispatch[]   @relation("AssignedUserDispatches")
+  employeeKpis EmployeeKpi[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Vehicle {
+  id             String        @id @default(cuid())
+  externalId     String        @unique
+  plateNumber    String
+  model          String
+  locationLabel  String?
+  statusLabel    String?
+  agencyId       String
+  agency         Agency        @relation(fields: [agencyId], references: [id])
+  reservations   Reservation[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Reservation {
+  id                String            @id @default(cuid())
+  externalId        String            @unique
+  source            ReservationSource
+  customerName      String?
+  startsAt          DateTime
+  endsAt            DateTime
+  pickupAt          DateTime
+  dropoffAt         DateTime
+  amountCents       Int
+  currency          String            @default("EUR")
+  vehicleId         String
+  vehicle           Vehicle           @relation(fields: [vehicleId], references: [id])
+  agencyId          String
+  agency            Agency            @relation(fields: [agencyId], references: [id])
+  dispatches        Dispatch[]
+  openclawScannedAt DateTime?
+  rawPayload         Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model Dispatch {
+  id             String         @id @default(cuid())
+  missionLabel   String
+  status         DispatchStatus @default(TODO)
+  notes          String?
+  reservationId  String
+  reservation    Reservation    @relation(fields: [reservationId], references: [id])
+  assignedUserId String?
+  assignedUser   User?          @relation("AssignedUserDispatches", fields: [assignedUserId], references: [id])
+  agencyId       String
+  agency         Agency         @relation(fields: [agencyId], references: [id])
+  startsAt       DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model EmployeeKpi {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  day           DateTime
+  handovers     Int      @default(0)
+  recoveries    Int      @default(0)
+  revenueCents  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, day])
+}
+
+model IntegrationSyncLog {
+  id             String   @id @default(cuid())
+  provider       String
+  agencyCode     String
+  requestId      String?
+  idempotencyKey String?
+  recordsCount   Int      @default(0)
+  receivedAt     DateTime
+  status         String
+  message        String?
+  rawPayload     Json
+  createdAt      DateTime @default(now())
+
+  @@index([provider, agencyCode, receivedAt])
+  @@index([idempotencyKey])
+}

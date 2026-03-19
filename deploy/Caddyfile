@@ -1,0 +1,26 @@
+{$DOMAIN:localhost} {
+  encode zstd gzip
+
+  @health path /healthz
+  respond @health "ok" 200
+
+  reverse_proxy app_blue:3000 app_green:3000 {
+    lb_policy round_robin
+    health_uri /login
+    health_interval 20s
+    health_timeout 5s
+    fail_duration 30s
+  }
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "SAMEORIGIN"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+
+  log {
+    output stdout
+    format console
+  }
+}
