@@ -175,8 +175,6 @@ export default function Home() {
   const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
   const [dispatchFilter, setDispatchFilter] = useState<"A dispatcher" | "Assigné" | null>(null);
 
-  const revenue = bookings.reduce((acc, item) => acc + item.amount, 0);
-  const occupancyRate = 74;
 
 
   const today = new Date().toLocaleDateString("fr-FR", {
@@ -455,8 +453,6 @@ export default function Home() {
 
   const overviewProps = {
     today,
-    revenue,
-    occupancyRate,
     fleetVehicles,
     fleetLoading,
     openclawStatus,
@@ -465,7 +461,7 @@ export default function Home() {
   return (
     <div className="dashboard-shell min-h-screen px-3 py-3 md:px-5 md:py-5 lg:px-6">
       <main className="mx-auto flex min-h-[calc(100vh-1.5rem)] w-full max-w-[1800px] flex-col gap-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.28em] text-muted">
               Citron ERP
@@ -517,13 +513,13 @@ export default function Home() {
           <section
             ref={desktopRootRef}
             className="split-root-desktop flex-1"
-            style={{ gridTemplateColumns: `${layout.desktopMain}fr 0.6rem ${1 - layout.desktopMain}fr` }}
+            style={{ gridTemplateColumns: `minmax(min-content, ${layout.desktopMain}fr) 0.6rem minmax(min-content, ${1 - layout.desktopMain}fr)` }}
           >
             <div
               ref={desktopLeftRef}
               className="split-column"
               style={{
-                gridTemplateRows: `${layout.desktopLeftTop}fr 0.6rem ${layout.desktopLeftPerf}fr 0.6rem ${desktopLeftPerfBottom}fr`,
+                gridTemplateRows: `minmax(min-content, ${layout.desktopLeftTop}fr) 0.6rem minmax(min-content, ${layout.desktopLeftPerf}fr) 0.6rem minmax(min-content, ${desktopLeftPerfBottom}fr)`,
               }}
             >
               <article className="dashboard-panel card p-3 md:p-4">
@@ -539,7 +535,7 @@ export default function Home() {
               <div
                 ref={desktopBottomRef}
                 className="split-row"
-                style={{ gridTemplateColumns: `${layout.desktopBottom}fr 0.6rem ${desktopBottomRight}fr` }}
+                style={{ gridTemplateColumns: `minmax(min-content, ${layout.desktopBottom}fr) 0.6rem minmax(min-content, ${desktopBottomRight}fr)` }}
               >
                 <article className="dashboard-panel card p-4">
                   <VehiclePanel {...sharedVehiclePanelProps} />
@@ -582,12 +578,12 @@ export default function Home() {
           <section
             ref={tabletRootRef}
             className="split-root-tablet flex-1"
-            style={{ gridTemplateColumns: `${layout.tabletMain}fr 0.6rem ${1 - layout.tabletMain}fr` }}
+            style={{ gridTemplateColumns: `minmax(min-content, ${layout.tabletMain}fr) 0.6rem minmax(min-content, ${1 - layout.tabletMain}fr)` }}
           >
             <div
               ref={tabletLeftRef}
               className="split-column"
-              style={{ gridTemplateRows: "auto 0.6rem 1fr 0.6rem 1fr" }}
+              style={{ gridTemplateRows: "auto 0.6rem minmax(min-content, 1fr) 0.6rem minmax(min-content, 1fr)" }}
             >
               <article className="dashboard-panel card p-3 md:p-4">
                 <OverviewPanel {...overviewProps} size="full" />
@@ -623,7 +619,7 @@ export default function Home() {
             <div
               ref={tabletRightRef}
               className="split-column"
-              style={{ gridTemplateRows: `${layout.tabletRightTop}fr 0.6rem ${tabletRightBottom}fr` }}
+              style={{ gridTemplateRows: `minmax(min-content, ${layout.tabletRightTop}fr) 0.6rem minmax(min-content, ${tabletRightBottom}fr)` }}
             >
               <article className="dashboard-panel card panel-priority p-4">
                 <ReservationsPanel bookings={bookings} size="full" />

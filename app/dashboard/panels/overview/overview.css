@@ -1,2 +1,49 @@
-/* OverviewPanel — uses global classes: .card, .chip, .custom-scrollbar */
-/* Panel-specific overrides can be added here */
+/* OverviewPanel — uses global classes: .card, .chip, .vehicle-toggle */
+
+.overview-period-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--card-secondary) 80%, var(--card));
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.overview-period-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--foreground);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  flex-shrink: 0;
+}
+
+.overview-period-nav:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-soft) 60%, transparent);
+  color: var(--accent);
+}
+
+.overview-period-nav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.overview-period-label {
+  padding: 0 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--foreground);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+  line-height: 2rem;
+}
