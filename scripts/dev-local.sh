@@ -55,5 +55,8 @@ npx prisma migrate deploy
 echo "Injection des donnees de demonstration..."
 npm run db:seed:demo-fleet
 
+echo "Sync initiale Fleetee..."
+npm run fleetee:sync || echo "Sync Fleetee ignoree (credentials manquants ou erreur reseau)"
+
 echo "Lancement du front local sur le port ${APP_PORT}..."
 exec npm run dev -- --port "$APP_PORT"
