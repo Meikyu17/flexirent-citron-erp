@@ -51,6 +51,14 @@ export type DispatchItem = {
   state: "À assigner" | "Assigné";
 };
 
+export type DispatchIcalFeedLink = {
+  name: string;
+  email: string | null;
+  eventCount: number;
+  updatedAt: string | null;
+  feedUrl: string;
+};
+
 export type ParkingOptions = {
   areas: string[];
   spots: string[];

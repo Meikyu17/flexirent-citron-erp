@@ -13,13 +13,16 @@
     "db:reset": "./scripts/reset-db-local.sh",
     "db:logs": "docker compose -f docker-compose.db.yml --env-file .env.db logs -f db",
     "db:seed:demo-fleet": "node scripts/seed-demo-fleet.mjs",
+    "db:seed:dispatch-ical:test": "node scripts/seed-dispatch-ical-test.mjs",
     "db:clear:demo-fleet": "node scripts/clear-demo-fleet.mjs",
-    "docker:image:build": "./scripts/docker-build-image.sh"
+    "docker:image:build": "./scripts/docker-build-image.sh",
+    "fleetee:sync": "node scripts/fleetee-sync.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
     "jose": "^6.2.2",
     "next": "16.2.0",
+    "playwright": "^1.58.2",
     "prisma": "^6.19.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",

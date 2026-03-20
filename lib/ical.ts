@@ -8,6 +8,15 @@ type IcalDispatchInput = {
   attendees: string[];
 };
 
+type IcalScheduleEventInput = {
+  uid: string;
+  title: string;
+  description: string;
+  location: string;
+  startAtIso: string;
+  endAtIso: string;
+};
+
 const escapeIcal = (value: string) =>
   value
     .replace(/\\/g, "\\\\")
@@ -40,5 +49,37 @@ export function generateDispatchIcs(input: IcalDispatchInput) {
     "END:VEVENT",
     "END:VCALENDAR",
   ];
+  return `${lines.join("\r\n")}\r\n`;
+}
+
+export function generateDispatchScheduleIcs(input: {
+  calendarName: string;
+  events: IcalScheduleEventInput[];
+}) {
+  const nowUtc = formatUtc(new Date().toISOString());
+  const lines: string[] = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Citron ERP//Dispatch Team Feed//FR",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    `X-WR-CALNAME:${escapeIcal(input.calendarName)}`,
+  ];
+
+  for (const event of input.events) {
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${escapeIcal(event.uid)}`,
+      `DTSTAMP:${nowUtc}`,
+      `DTSTART:${formatUtc(event.startAtIso)}`,
+      `DTEND:${formatUtc(event.endAtIso)}`,
+      `SUMMARY:${escapeIcal(event.title)}`,
+      `DESCRIPTION:${escapeIcal(event.description)}`,
+      `LOCATION:${escapeIcal(event.location)}`,
+      "END:VEVENT",
+    );
+  }
+
+  lines.push("END:VCALENDAR");
   return `${lines.join("\r\n")}\r\n`;
 }

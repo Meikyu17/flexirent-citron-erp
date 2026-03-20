@@ -3,7 +3,9 @@ import {
   getAuthUserFromCookie,
   unauthorizedResponse,
 } from "@/lib/auth";
-import { generateDispatchIcs } from "@/lib/ical";
+import { buildIcalDescription, operationLabel } from "@/lib/dispatch-ical";
+import { generateDispatchIcs, generateDispatchScheduleIcs } from "@/lib/ical";
+import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
 const dispatchIcalSchema = z.object({
@@ -16,6 +18,81 @@ const dispatchIcalSchema = z.object({
   endAt: z.string().datetime(),
   attendees: z.array(z.string().email()).min(1),
 });
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const token = searchParams.get("token");
+
+  if (!token) {
+    return Response.json(
+      { ok: false, error: "Token iCal manquant" },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const employee = await prisma.dispatchIcalEmployee.findUnique({
+      where: { token },
+      include: {
+        events: {
+          orderBy: [
+            { appointmentAt: "asc" },
+            { updatedAt: "desc" },
+          ],
+        },
+      },
+    });
+
+    if (!employee) {
+      return Response.json(
+        { ok: false, error: "Flux iCal introuvable" },
+        { status: 404 },
+      );
+    }
+
+    const ics = generateDispatchScheduleIcs({
+      calendarName: `Dispatch ${employee.name}`,
+      events: employee.events.map((event) => ({
+        uid: `${event.dispatchRef}-${employee.slug}@citron-erp`,
+        title: `${operationLabel(event.operationType)} · ${event.customerName}`,
+        description: buildIcalDescription({
+          reservationRef: event.reservationRef,
+          missionLabel: event.missionLabel,
+          customerName: event.customerName,
+          operationType: event.operationType,
+          vehicleModel: event.vehicleModel,
+          plateNumber: event.plateNumber,
+          appointmentLocation: event.appointmentLocation,
+          appointmentAt: event.appointmentAt,
+          agencyLabel: event.agencyLabel,
+          sourceLabel: event.sourceLabel,
+          notes: event.notes,
+        }),
+        location: event.appointmentLocation,
+        startAtIso: event.appointmentAt.toISOString(),
+        endAtIso: event.endsAt.toISOString(),
+      })),
+    });
+
+    return new Response(ics, {
+      headers: {
+        "Content-Type": "text/calendar; charset=utf-8",
+        "Content-Disposition": `inline; filename="dispatch-${employee.slug}.ics"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    console.error("GET /api/dispatch/ical failed", error);
+    return Response.json(
+      {
+        ok: false,
+        error:
+          "Generation du flux iCal impossible. Verifiez la connexion a PostgreSQL.",
+      },
+      { status: 503 },
+    );
+  }
+}
 
 export async function POST(request: Request) {
   const user = await getAuthUserFromCookie();

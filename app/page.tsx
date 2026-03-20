@@ -161,14 +161,14 @@ const initialDispatches: DispatchItem[] = [
     id: "D-10",
     bookingRef: "R-2198",
     mission: "Jeudi 14 Janvier / Jean-Jaurès / 13h45",
-    members: ["Nathan", "Adrian", "Aimery", "Louise"],
+    members: [],
     state: "À assigner",
   },
   {
     id: "D-11",
     bookingRef: "R-2191",
     mission: "Jeudi 14 Janvier / Jean-Jaurès / 15h30",
-    members: ["Nathan", "Louise"],
+    members: ["Nathan"],
     state: "Assigné",
   },
 ];
@@ -179,6 +179,8 @@ const employeeStats: EmployeeStat[] = [
   { name: "Adrian", handovers: 16, returns: 17 },
   { name: "Aimery", handovers: 14, returns: 15 },
 ];
+
+const dispatchOperators = employeeStats.map((employee) => employee.name);
 
 function formatScrapeElapsed(lastScrapeAt: string | null, now: number): string {
   if (!lastScrapeAt) return "jamais";
@@ -245,8 +247,6 @@ export default function Home() {
   const visibleVehicles = fleetVehicles.filter(
     (vehicle) => selectedBrand === "ALL" || vehicle.agency.brand === selectedBrand,
   );
-
-  const operators = employeeStats.map((e) => e.name);
 
   // — Layout persistence —
   useEffect(() => {
@@ -359,6 +359,38 @@ export default function Home() {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  // — Dispatch iCal sync —
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncDispatchIcal = async () => {
+      try {
+        const response = await fetch("/api/dispatch/ical/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            operators: dispatchOperators,
+            bookings,
+            dispatchItems,
+          }),
+        });
+        const payload = (await response.json()) as { ok: boolean; error?: string };
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error ?? "Synchronisation iCal impossible");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Dispatch iCal sync failed", error);
+        }
+      }
+    };
+
+    void syncDispatchIcal();
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatchItems]);
+
   // — Resize —
   useEffect(() => {
     if (!resizeState) return;
@@ -411,7 +443,7 @@ export default function Home() {
       current.map((d) => {
         if (d.id !== selectedDispatchId) return d;
         const isAssigned = d.members.includes(name);
-        const newMembers = isAssigned ? d.members.filter((m) => m !== name) : [...d.members, name];
+        const newMembers = isAssigned ? [] : [name];
         return { ...d, members: newMembers, state: newMembers.length > 0 ? "Assigné" : "À assigner" };
       }),
     );
@@ -518,7 +550,7 @@ export default function Home() {
     bookings,
     dispatchFilter,
     selectedDispatchId,
-    operators,
+    operators: dispatchOperators,
     onFilterChange: setDispatchFilter,
     onSelectDispatch: setSelectedDispatchId,
     onAssignOperator: handleAssignOperator,

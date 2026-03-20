@@ -9,6 +9,7 @@ const secret = new TextEncoder().encode(
 const publicPaths = [
   "/login",
   "/api/auth/login",
+  "/api/dispatch/ical",
   "/api/openclaw/events",
   "/api/v1/openclaw/events",
 ];

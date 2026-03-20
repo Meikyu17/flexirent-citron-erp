@@ -67,6 +67,47 @@
   font-weight: 700;
 }
 
+.dispatch-ical-panel {
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--card-secondary) 84%, var(--card));
+  padding: 0.7rem;
+}
+
+.dispatch-ical-feed-list {
+  max-height: 11rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.45rem;
+  padding-right: 0.2rem;
+}
+
+.dispatch-ical-feed-item {
+  border: 1px solid color-mix(in srgb, var(--border) 95%, var(--card-secondary));
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.dispatch-ical-link {
+  margin-top: 0.35rem;
+  display: block;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-decoration: underline;
+  color: color-mix(in srgb, var(--accent) 84%, var(--foreground));
+  word-break: break-all;
+}
+
+.dispatch-ical-link:hover,
+.dispatch-ical-link:focus-visible {
+  color: var(--accent);
+}
+
+.dispatch-ical-error {
+  color: var(--danger);
+}
+
 .dispatch-state-badge {
   display: inline-flex;
   align-items: center;

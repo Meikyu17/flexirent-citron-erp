@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { BookingItem, DispatchItem } from "../../shared/types";
+import type {
+  BookingItem,
+  DispatchIcalFeedLink,
+  DispatchItem,
+} from "../../shared/types";
 import "./dispatch.css";
 
 function formatIsoDay(isoDate: string) {
@@ -34,6 +38,25 @@ const agencyLabel: Record<BookingItem["agency"], string> = {
   FLEXIRENT: "Flexirent",
 };
 
+function formatFeedUpdatedAt(updatedAt: string | null) {
+  if (!updatedAt) {
+    return "jamais mis a jour";
+  }
+
+  const date = new Date(updatedAt);
+  if (Number.isNaN(date.getTime())) {
+    return "mise a jour inconnue";
+  }
+
+  return date.toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function DispatchPanel({
   dispatchItems,
   bookings,
@@ -54,6 +77,10 @@ export function DispatchPanel({
   onAssignOperator: (name: string) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [showIcalLinks, setShowIcalLinks] = useState(false);
+  const [icalFeeds, setIcalFeeds] = useState<DispatchIcalFeedLink[]>([]);
+  const [icalLoading, setIcalLoading] = useState(false);
+  const [icalError, setIcalError] = useState<string | null>(null);
   const bookingByRef = useMemo(
     () => new Map(bookings.map((booking) => [booking.id, booking])),
     [bookings],
@@ -101,6 +128,47 @@ export function DispatchPanel({
   const selectedDispatch =
     dispatchItems.find((d) => d.id === selectedDispatchId) ?? null;
 
+  const loadIcalFeeds = async () => {
+    setIcalLoading(true);
+    setIcalError(null);
+
+    try {
+      const response = await fetch("/api/dispatch/ical/feeds", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as {
+        ok: boolean;
+        feeds?: DispatchIcalFeedLink[];
+        error?: string;
+      };
+
+      if (!response.ok || !payload.ok || !payload.feeds) {
+        throw new Error(payload.error ?? "Chargement iCal impossible");
+      }
+
+      setIcalFeeds(payload.feeds);
+    } catch (error) {
+      setIcalError(
+        error instanceof Error
+          ? error.message
+          : "Chargement des liens iCal impossible",
+      );
+    } finally {
+      setIcalLoading(false);
+    }
+  };
+
+  const handleToggleIcal = () => {
+    setShowIcalLinks((current) => {
+      const nextValue = !current;
+      if (nextValue) {
+        void loadIcalFeeds();
+      }
+      return nextValue;
+    });
+  };
+
   return (
     <>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
@@ -111,6 +179,13 @@ export function DispatchPanel({
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            className={`vehicle-toggle cursor-pointer ${showIcalLinks ? "vehicle-toggle-active" : ""}`}
+            onClick={handleToggleIcal}
+          >
+            iCal
+          </button>
           <button
             type="button"
             className={`vehicle-toggle cursor-pointer ${dispatchFilter === null ? "vehicle-toggle-active" : ""}`}
@@ -138,6 +213,57 @@ export function DispatchPanel({
           </button>
         </div>
       </div>
+
+      {showIcalLinks && (
+        <div className="mb-3 dispatch-ical-panel">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="dispatch-selected-label m-0">Liens iCal par employe</p>
+            <button
+              type="button"
+              className="vehicle-toggle cursor-pointer"
+              onClick={() => void loadIcalFeeds()}
+            >
+              Rafraichir
+            </button>
+          </div>
+
+          {icalLoading && (
+            <p className="text-xs text-muted">Chargement des liens iCal...</p>
+          )}
+          {!icalLoading && icalError && (
+            <p className="dispatch-ical-error text-xs">{icalError}</p>
+          )}
+          {!icalLoading && !icalError && icalFeeds.length === 0 && (
+            <p className="text-xs text-muted">
+              Aucun employe detecte. Affectez un collaborateur pour generer les flux.
+            </p>
+          )}
+
+          {!icalLoading && !icalError && icalFeeds.length > 0 && (
+            <div className="dispatch-ical-feed-list custom-scrollbar">
+              {icalFeeds.map((feed) => (
+                <article key={feed.feedUrl} className="dispatch-ical-feed-item">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">{feed.name}</p>
+                    <span className="chip">{feed.eventCount} evenement(s)</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    Derniere synchro: {formatFeedUpdatedAt(feed.updatedAt)}
+                  </p>
+                  <a
+                    href={feed.feedUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="dispatch-ical-link"
+                  >
+                    {feed.feedUrl}
+                  </a>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mb-3 grid grid-cols-3 gap-2">
         <div className="dispatch-stat-card">
@@ -201,6 +327,9 @@ export function DispatchPanel({
                 );
               })}
             </div>
+            <p className="mt-2 text-xs text-muted">
+              Une seule personne peut etre assignee a la fois.
+            </p>
           </>
         )}
       </div>
@@ -282,9 +411,9 @@ export function DispatchPanel({
                     <div className="dispatch-detail-item">
                       <span className="dispatch-detail-label">Équipe</span>
                       <span className="dispatch-detail-value">
-                        {dispatch.members.length > 0
-                          ? `${dispatch.members.length} assigné(s)`
-                          : "Aucun assigné"}
+                        {dispatch.members[0]
+                          ? `Assigne a ${dispatch.members[0]}`
+                          : "Aucun assigne"}
                       </span>
                     </div>
                   </div>

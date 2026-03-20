@@ -159,6 +159,11 @@ enum ParkingOptionKind {
   SPOT
 }
 
+enum DispatchIcalOperationType {
+  PICKUP
+  RETURN
+}
+
 model ParkingOption {
   id        String            @id @default(cuid())
   kind      ParkingOptionKind
@@ -166,4 +171,39 @@ model ParkingOption {
   createdAt DateTime          @default(now())
 
   @@unique([kind, value])
+}
+
+model DispatchIcalEmployee {
+  id        String             @id @default(cuid())
+  name      String             @unique
+  slug      String             @unique
+  token     String             @unique
+  email     String?
+  events    DispatchIcalEvent[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model DispatchIcalEvent {
+  id                  String                    @id @default(cuid())
+  dispatchRef         String
+  reservationRef      String
+  missionLabel        String
+  customerName        String
+  operationType       DispatchIcalOperationType
+  agencyLabel         String
+  sourceLabel         String
+  vehicleModel        String
+  plateNumber         String
+  appointmentLocation String
+  appointmentAt       DateTime
+  endsAt              DateTime
+  notes               String?
+  employeeId          String
+  employee            DispatchIcalEmployee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  @@unique([employeeId, dispatchRef])
+  @@index([employeeId, appointmentAt])
 }
