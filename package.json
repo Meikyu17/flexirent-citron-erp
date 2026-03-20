@@ -4,9 +4,17 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "./scripts/dev-local.sh",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:up": "docker compose -f docker-compose.db.yml --env-file .env.db up -d",
+    "db:down": "docker compose -f docker-compose.db.yml --env-file .env.db down",
+    "db:reset": "./scripts/reset-db-local.sh",
+    "db:logs": "docker compose -f docker-compose.db.yml --env-file .env.db logs -f db",
+    "db:seed:demo-fleet": "node scripts/seed-demo-fleet.mjs",
+    "db:clear:demo-fleet": "node scripts/clear-demo-fleet.mjs",
+    "docker:image:build": "./scripts/docker-build-image.sh"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",

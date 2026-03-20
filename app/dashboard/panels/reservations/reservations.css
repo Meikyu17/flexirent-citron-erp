@@ -1,0 +1,33 @@
+/* ReservationsPanel — uses global classes: .chip, .card, .custom-scrollbar */
+
+.reservations-day-separator {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.85rem 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.reservations-day-separator::before,
+.reservations-day-separator::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.reservations-day-separator--first {
+  margin-top: 0;
+}
+
+.panel-priority {
+  background: color-mix(in srgb, var(--accent-soft) 52%, var(--card));
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border));
+  box-shadow:
+    0 20px 45px -28px color-mix(in srgb, var(--accent) 28%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--accent-soft) 60%, transparent);
+}

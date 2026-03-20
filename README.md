@@ -44,6 +44,74 @@ npm run lint
 npm run build
 ```
 
+### PostgreSQL local via Docker uniquement
+
+Si vous voulez juste la base sans lancer toute la stack de deploiement :
+
+```bash
+cp .env.db.example .env.db
+npm run db:up
+```
+
+Puis appliquez les migrations et injectez la flotte de demo :
+
+```bash
+npx prisma migrate dev
+npm run db:seed:demo-fleet
+```
+
+Pour suivre les logs :
+
+```bash
+npm run db:logs
+```
+
+Pour arreter cette base locale :
+
+```bash
+npm run db:down
+```
+
+Pour repartir d'une base locale vide si une migration a ete interrompue :
+
+```bash
+npm run db:reset
+```
+
+### Demarrage local complet en une commande
+
+Pour nettoyer les serveurs Next en doublon, lancer la base Docker locale, appliquer les migrations existantes, injecter les donnees de demo, puis demarrer le front :
+
+```bash
+npm run dev:local
+```
+
+Ce script est volontairement separe du build d'image Docker.
+
+### Build d'image Docker
+
+Si vous voulez seulement construire une image Docker applicative :
+
+```bash
+npm run docker:image:build
+```
+
+### Faux vehicules de demonstration
+
+Pour injecter une flotte de test en base :
+
+```bash
+npm run db:seed:demo-fleet
+```
+
+Pour supprimer facilement ces faux vehicules plus tard :
+
+```bash
+npm run db:clear:demo-fleet
+```
+
+Les donnees de demo sont reperees par un `externalId` qui commence par `demo_`.
+
 ## 2) Lancer avec Docker (recommande)
 
 ### Prerequis

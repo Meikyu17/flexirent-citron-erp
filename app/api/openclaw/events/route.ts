@@ -1,6 +1,15 @@
 import { openclawPayloadSchema } from "@/lib/openclaw";
 import { ingestOpenclawPayload } from "@/lib/openclaw-ingestion";
 
+export async function GET() {
+  return Response.json({
+    ok: true,
+    service: "openclaw",
+    status: "reachable",
+    checkedAt: new Date().toISOString(),
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const requestId = request.headers.get("x-request-id");

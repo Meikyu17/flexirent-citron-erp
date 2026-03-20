@@ -1,1 +1,1 @@
-export { POST } from "@/app/api/openclaw/events/route";
+export { GET, POST } from "@/app/api/openclaw/events/route";

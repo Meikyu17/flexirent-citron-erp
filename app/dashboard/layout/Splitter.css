@@ -1,0 +1,69 @@
+.splitter {
+  position: relative;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  touch-action: none;
+}
+
+.splitter::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--border) 72%, transparent);
+  opacity: 0;
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease,
+    transform 140ms ease;
+}
+
+.splitter-x {
+  cursor: col-resize;
+}
+
+.splitter-y {
+  cursor: row-resize;
+}
+
+.splitter-x::after,
+.splitter-y::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--accent) 40%, var(--border));
+  opacity: 0;
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease,
+    transform 140ms ease;
+}
+
+.splitter-x::after {
+  height: 2.8rem;
+  width: 0.2rem;
+}
+
+.splitter-y::after {
+  height: 0.2rem;
+  width: 2.8rem;
+}
+
+.splitter:hover::before,
+.splitter:focus-visible::before {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--border));
+  transform: scale(1.02);
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after {
+  opacity: 1;
+}
+
+.splitter:focus-visible {
+  outline: none;
+}

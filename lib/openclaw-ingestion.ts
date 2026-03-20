@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import {
+  parseLocationLabel,
+  statusFromLabel,
+  statusLabelFromOperationalStatus,
+} from "@/lib/vehicles";
 import type { OpenclawPayload } from "@/lib/openclaw";
-import { Prisma, ReservationSource } from "@prisma/client";
+import { AgencyBrand, Prisma, ReservationSource } from "@prisma/client";
 
 const sourceMap: Record<string, ReservationSource> = {
   fleetee_a: ReservationSource.FLEETEE_A,
@@ -13,6 +18,11 @@ const sourceMap: Record<string, ReservationSource> = {
 const agencyNameMap: Record<OpenclawPayload["agencyCode"], string> = {
   "citron-centre": "Citron Centre",
   "jean-jaures": "Jean-Jaures",
+};
+
+const agencyBrandMap: Record<OpenclawPayload["agencyCode"], AgencyBrand> = {
+  "citron-centre": AgencyBrand.CITRON_LOCATION,
+  "jean-jaures": AgencyBrand.FLEXIRENT,
 };
 
 export async function ingestOpenclawPayload(
@@ -39,11 +49,16 @@ export async function ingestOpenclawPayload(
 
   const agency = await prisma.agency.upsert({
     where: { code: payload.agencyCode },
-    update: {},
+    update: {
+      name: agencyNameMap[payload.agencyCode],
+      city: payload.agencyCode === "citron-centre" ? "Lyon" : "Villeurbanne",
+      brand: agencyBrandMap[payload.agencyCode],
+    },
     create: {
       code: payload.agencyCode,
       city: payload.agencyCode === "citron-centre" ? "Lyon" : "Villeurbanne",
       name: agencyNameMap[payload.agencyCode],
+      brand: agencyBrandMap[payload.agencyCode],
     },
   });
 
@@ -53,6 +68,9 @@ export async function ingestOpenclawPayload(
 
   for (const event of payload.events) {
     totalAmountCents += event.amountCents;
+    const parsedLocation = parseLocationLabel(event.locationLabel);
+    const operationalStatus = statusFromLabel(event.statusLabel);
+
     const vehicle = await prisma.vehicle.upsert({
       where: { externalId: event.vehicleExternalId },
       update: {
@@ -60,6 +78,9 @@ export async function ingestOpenclawPayload(
         model: event.model ?? "Modele non renseigne",
         locationLabel: event.locationLabel,
         statusLabel: event.statusLabel,
+        parkingArea: parsedLocation.parkingArea,
+        parkingSpot: parsedLocation.parkingSpot,
+        operationalStatus,
         agencyId: agency.id,
       },
       create: {
@@ -67,7 +88,11 @@ export async function ingestOpenclawPayload(
         plateNumber: event.plateNumber,
         model: event.model ?? "Modele non renseigne",
         locationLabel: event.locationLabel,
-        statusLabel: event.statusLabel,
+        statusLabel:
+          event.statusLabel ?? statusLabelFromOperationalStatus(operationalStatus),
+        parkingArea: parsedLocation.parkingArea,
+        parkingSpot: parsedLocation.parkingSpot,
+        operationalStatus,
         agencyId: agency.id,
       },
     });

@@ -26,11 +26,23 @@ enum DispatchStatus {
   DONE
 }
 
+enum AgencyBrand {
+  CITRON_LOCATION
+  FLEXIRENT
+}
+
+enum VehicleOperationalStatus {
+  AVAILABLE
+  RESERVED
+  OUT_OF_SERVICE
+}
+
 model Agency {
   id           String        @id @default(cuid())
   code         String        @unique
   name         String
   city         String
+  brand        AgencyBrand   @default(CITRON_LOCATION)
   vehicles     Vehicle[]
   users        User[]
   reservations Reservation[]
@@ -40,33 +52,36 @@ model Agency {
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
+  id           String        @id @default(cuid())
+  email        String        @unique
   passwordHash String?
   firstName    String
   lastName     String
   role         UserRole
-  isActive     Boolean      @default(true)
+  isActive     Boolean       @default(true)
   agencyId     String
-  agency       Agency       @relation(fields: [agencyId], references: [id])
-  dispatches   Dispatch[]   @relation("AssignedUserDispatches")
+  agency       Agency        @relation(fields: [agencyId], references: [id])
+  dispatches   Dispatch[]    @relation("AssignedUserDispatches")
   employeeKpis EmployeeKpi[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model Vehicle {
-  id             String        @id @default(cuid())
-  externalId     String        @unique
-  plateNumber    String
-  model          String
-  locationLabel  String?
-  statusLabel    String?
-  agencyId       String
-  agency         Agency        @relation(fields: [agencyId], references: [id])
-  reservations   Reservation[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                String                   @id @default(cuid())
+  externalId        String                   @unique
+  plateNumber       String
+  model             String
+  locationLabel     String?
+  statusLabel       String?
+  parkingArea       String?
+  parkingSpot       String?
+  operationalStatus VehicleOperationalStatus @default(AVAILABLE)
+  agencyId          String
+  agency            Agency                   @relation(fields: [agencyId], references: [id])
+  reservations      Reservation[]
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
 }
 
 model Reservation {
@@ -86,7 +101,7 @@ model Reservation {
   agency            Agency            @relation(fields: [agencyId], references: [id])
   dispatches        Dispatch[]
   openclawScannedAt DateTime?
-  rawPayload         Json?
+  rawPayload        Json?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
@@ -109,15 +124,15 @@ model Dispatch {
 }
 
 model EmployeeKpi {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  day           DateTime
-  handovers     Int      @default(0)
-  recoveries    Int      @default(0)
-  revenueCents  Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  day          DateTime
+  handovers    Int      @default(0)
+  recoveries   Int      @default(0)
+  revenueCents Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([userId, day])
 }
@@ -137,4 +152,18 @@ model IntegrationSyncLog {
 
   @@index([provider, agencyCode, receivedAt])
   @@index([idempotencyKey])
+}
+
+enum ParkingOptionKind {
+  AREA
+  SPOT
+}
+
+model ParkingOption {
+  id        String            @id @default(cuid())
+  kind      ParkingOptionKind
+  value     String
+  createdAt DateTime          @default(now())
+
+  @@unique([kind, value])
 }
