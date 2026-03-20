@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import type { AgencyBrand, FleetVehicle, ParkingOptions, VehicleDraft } from "../../shared/types";
+import { useMemo, useState } from "react";
+import type {
+  AgencyBrand,
+  FleetVehicle,
+  ParkingOptions,
+  VehicleDraft,
+  VehicleOperationalStatus,
+} from "../../shared/types";
 import "./vehicles.css";
+
+type VehicleStatusFilter = "ALL" | VehicleOperationalStatus;
 
 export function VehiclePanel({
   vehicles,
@@ -32,6 +40,7 @@ export function VehiclePanel({
   onDeleteParkingArea: (value: string) => void;
 }) {
   const [newAreaInput, setNewAreaInput] = useState("");
+  const [statusFilter, setStatusFilter] = useState<VehicleStatusFilter>("ALL");
 
   const handleAddArea = () => {
     const trimmed = newAreaInput.trim();
@@ -40,13 +49,39 @@ export function VehiclePanel({
     setNewAreaInput("");
   };
 
+  const visibleVehicles = useMemo(() => {
+    const byStatus =
+      statusFilter === "ALL"
+        ? vehicles
+        : vehicles.filter((vehicle) => vehicle.operationalStatus === statusFilter);
+
+    if (statusFilter !== "ALL") {
+      return byStatus;
+    }
+
+    const rank: Record<VehicleOperationalStatus, number> = {
+      AVAILABLE: 0,
+      RESERVED: 1,
+      OUT_OF_SERVICE: 2,
+    };
+
+    return [...byStatus].sort((a, b) => {
+      const statusDelta = rank[a.operationalStatus] - rank[b.operationalStatus];
+      if (statusDelta !== 0) return statusDelta;
+      return `${a.model} ${a.plateNumber}`.localeCompare(
+        `${b.model} ${b.plateNumber}`,
+        "fr",
+      );
+    });
+  }, [vehicles, statusFilter]);
+
   return (
     <>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-xl font-semibold">Vehicules</h2>
+          <h2 className="text-xl font-semibold">Véhicules</h2>
           <p className="mt-1 text-sm text-muted">
-            Tri par agence, changement d&apos;emplacement et correction d&apos;etat
+            Tri par agence, changement d&apos;emplacement et correction d&apos;état
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -62,7 +97,7 @@ export function VehiclePanel({
             className={`vehicle-toggle cursor-pointer ${selectedBrand === "CITRON_LOCATION" ? "vehicle-toggle-active" : ""}`}
             onClick={() => onBrandChange("CITRON_LOCATION")}
           >
-            Citron location
+            Citron Location
           </button>
           <button
             type="button"
@@ -74,13 +109,44 @@ export function VehiclePanel({
         </div>
       </div>
 
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          className={`vehicle-toggle cursor-pointer ${statusFilter === "ALL" ? "vehicle-toggle-active" : ""}`}
+          onClick={() => setStatusFilter("ALL")}
+        >
+          Tous états
+        </button>
+        <button
+          type="button"
+          className={`vehicle-toggle cursor-pointer ${statusFilter === "AVAILABLE" ? "vehicle-toggle-active" : ""}`}
+          onClick={() => setStatusFilter("AVAILABLE")}
+        >
+          Disponible
+        </button>
+        <button
+          type="button"
+          className={`vehicle-toggle cursor-pointer ${statusFilter === "RESERVED" ? "vehicle-toggle-active" : ""}`}
+          onClick={() => setStatusFilter("RESERVED")}
+        >
+          Loué
+        </button>
+        <button
+          type="button"
+          className={`vehicle-toggle cursor-pointer ${statusFilter === "OUT_OF_SERVICE" ? "vehicle-toggle-active" : ""}`}
+          onClick={() => setStatusFilter("OUT_OF_SERVICE")}
+        >
+          Hors service
+        </button>
+      </div>
+
       <div className="mb-3 rounded-xl border border-border bg-card-secondary px-3 py-2">
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
           Endroits
         </p>
         <div className="flex flex-wrap gap-1.5">
           {parkingOptions.areas.length === 0 && (
-            <span className="text-xs text-muted">Aucun endroit configure</span>
+            <span className="text-xs text-muted">Aucun endroit configuré</span>
           )}
           {parkingOptions.areas.map((area) => (
             <span key={area} className="chip flex items-center gap-1.5">
@@ -135,17 +201,17 @@ export function VehiclePanel({
       <div className="custom-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto pr-2">
         {fleetLoading ? (
           <div className="card bg-card-secondary p-4 text-sm text-muted">
-            Chargement des vehicules...
+            Chargement des véhicules...
           </div>
         ) : null}
 
-        {!fleetLoading && vehicles.length === 0 ? (
+        {!fleetLoading && visibleVehicles.length === 0 ? (
           <div className="card bg-card-secondary p-4 text-sm text-muted">
-            Aucun vehicule pour ce filtre.
+            Aucun véhicule pour ce filtre.
           </div>
         ) : null}
 
-        {vehicles.map((vehicle) => {
+        {visibleVehicles.map((vehicle) => {
           const draft = drafts[vehicle.id];
           if (!draft) return null;
 
@@ -178,7 +244,7 @@ export function VehiclePanel({
 
               <div className="mt-4">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                  Etat en direct
+                  État en direct
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <span
@@ -245,7 +311,7 @@ export function VehiclePanel({
                     disabled={!isDirty || savingVehicleId === vehicle.id}
                     onClick={() => onSave(vehicle.id)}
                   >
-                    Mettre a jour
+                    Enregistrer
                   </button>
                 </div>
               </div>

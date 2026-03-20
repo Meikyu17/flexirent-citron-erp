@@ -14,12 +14,12 @@ export function PerformancePanel({
     <>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-xl font-semibold">Performance equipe</h2>
+          <h2 className="text-xl font-semibold">Performance équipe</h2>
           <p className="mt-1 text-sm text-muted">
-            Nombre de remises et recuperations des cles par employe
+            Nombre de remises et récupérations de clés par employé
           </p>
         </div>
-        <span className="chip">Equipe terrain</span>
+        <span className="chip">Équipe terrain</span>
       </div>
 
       <div className={
@@ -35,7 +35,7 @@ export function PerformancePanel({
               <span>{employee.handovers}</span>
             </div>
             <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="text-muted">Recuperations</span>
+              <span className="text-muted">Récupérations</span>
               <span>{employee.returns}</span>
             </div>
           </div>

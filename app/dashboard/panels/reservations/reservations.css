@@ -1,5 +1,83 @@
 /* ReservationsPanel — uses global classes: .chip, .card, .custom-scrollbar */
 
+.sms-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--foreground) 28%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.sms-modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1.1rem;
+  box-shadow: 0 24px 64px -16px color-mix(in srgb, var(--foreground) 24%, transparent);
+  width: min(480px, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.sms-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sms-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.sms-modal-close:hover {
+  background: var(--card-secondary);
+  color: var(--foreground);
+}
+
+.sms-modal-textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card-secondary);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  padding: 0.75rem 1rem;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.sms-modal-textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+.sms-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .reservations-day-separator {
   display: flex;
   align-items: center;
@@ -24,10 +102,151 @@
   margin-top: 0;
 }
 
+.reservation-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.reservation-action-call {
+  background: color-mix(in srgb, var(--success) 10%, var(--card-secondary));
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border));
+  color: var(--success);
+}
+
+.reservation-action-call:hover {
+  background: color-mix(in srgb, var(--success) 18%, var(--card-secondary));
+  border-color: color-mix(in srgb, var(--success) 42%, var(--border));
+}
+
+.reservation-action-sms {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-secondary));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+  color: var(--accent);
+}
+
+.reservation-action-sms:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--card-secondary));
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+}
+
+.reservation-overflow {
+  position: relative;
+  display: inline-flex;
+}
+
+.reservation-overflow-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 1.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--card) 92%, var(--card-secondary));
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.reservation-overflow-trigger:hover,
+.reservation-overflow-trigger:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--card-secondary));
+  color: var(--foreground);
+  outline: none;
+}
+
+.reservation-overflow-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.35rem);
+  z-index: 15;
+  min-width: 13rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card);
+  box-shadow: 0 16px 34px -16px color-mix(in srgb, var(--foreground) 30%, transparent);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.reservation-overflow-item {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.reservation-overflow-item:hover,
+.reservation-overflow-item:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 30%, var(--card-secondary));
+  outline: none;
+}
+
+.reservation-overflow-item-danger {
+  color: var(--danger);
+}
+
+.reservation-overflow-item-danger:hover,
+.reservation-overflow-item-danger:focus-visible {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+  background: color-mix(in srgb, var(--danger) 14%, var(--card-secondary));
+}
+
+.booking-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.booking-type-pickup {
+  background: color-mix(in srgb, var(--success, #22c55e) 14%, transparent);
+  color: var(--success, #22c55e);
+  border-color: color-mix(in srgb, var(--success, #22c55e) 30%, transparent);
+}
+
+.booking-type-return {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
 .panel-priority {
-  background: color-mix(in srgb, var(--accent-soft) 52%, var(--card));
-  border-color: color-mix(in srgb, var(--accent) 26%, var(--border));
+  background: color-mix(in srgb, var(--warning) 6%, var(--card));
+  border-color: color-mix(in srgb, var(--warning) 22%, var(--border));
   box-shadow:
-    0 20px 45px -28px color-mix(in srgb, var(--accent) 28%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--accent-soft) 60%, transparent);
+    0 24px 48px -20px color-mix(in srgb, var(--warning) 16%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 50%, transparent);
 }

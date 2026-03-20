@@ -1,12 +1,16 @@
 export type BookingItem = {
   id: string;
   date: string; // ISO "YYYY-MM-DD"
+  type: "PICKUP" | "RETURN"; // remise de clé ou retour
   client: string;
-  pickup: string;  // "Lieu / HHhMM"
-  dropoff: string; // "Lieu / HHhMM"
+  pickup: string;      // "Lieu / HHhMM"
+  dropoff: string;     // "Lieu / HHhMM"
+  dropoffDate: string; // ISO "YYYY-MM-DD"
   car: string;
+  plateNumber: string;
   amount: number;
   source: "Fleetee A" | "Fleetee B" | "Getaround" | "Turo";
+  agency: AgencyBrand;
 };
 
 export type VehicleOperationalStatus =
@@ -44,7 +48,7 @@ export type DispatchItem = {
   bookingRef: string;
   mission: string;
   members: string[];
-  state: "A dispatcher" | "Assigné";
+  state: "À assigner" | "Assigné";
 };
 
 export type ParkingOptions = {

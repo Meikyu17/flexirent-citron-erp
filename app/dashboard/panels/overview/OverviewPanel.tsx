@@ -22,23 +22,23 @@ type PeriodData = {
 // Indexed from oldest to newest — periods[last] = current month
 
 const ALL_PERIODS: PeriodData[] = [
-  { label: "Decembre 2025", startLabel: "01/12", endLabel: "31/12", revenue: 27400, vehiclesRented: 9,  occupancyRate: 58 },
+  { label: "Décembre 2025", startLabel: "01/12", endLabel: "31/12", revenue: 27400, vehiclesRented: 9,  occupancyRate: 58 },
   { label: "Janvier 2026",  startLabel: "01/01", endLabel: "31/01", revenue: 31200, vehiclesRented: 11, occupancyRate: 68 },
-  { label: "Fevrier 2026",  startLabel: "01/02", endLabel: "28/02", revenue: 29800, vehiclesRented: 10, occupancyRate: 63 },
+  { label: "Février 2026",  startLabel: "01/02", endLabel: "28/02", revenue: 29800, vehiclesRented: 10, occupancyRate: 63 },
   { label: "Mars 2026",     startLabel: "01/03", endLabel: "31/03", revenue: 34700, vehiclesRented: 12, occupancyRate: 74 },
 ];
 
 const AGENCY_PERIODS: Record<AgencyBrand, PeriodData[]> = {
   CITRON_LOCATION: [
-    { label: "Decembre 2025", startLabel: "01/12", endLabel: "31/12", revenue: 15200, vehiclesRented: 5, occupancyRate: 54 },
+    { label: "Décembre 2025", startLabel: "01/12", endLabel: "31/12", revenue: 15200, vehiclesRented: 5, occupancyRate: 54 },
     { label: "Janvier 2026",  startLabel: "01/01", endLabel: "31/01", revenue: 17800, vehiclesRented: 6, occupancyRate: 65 },
-    { label: "Fevrier 2026",  startLabel: "01/02", endLabel: "28/02", revenue: 16400, vehiclesRented: 6, occupancyRate: 60 },
+    { label: "Février 2026",  startLabel: "01/02", endLabel: "28/02", revenue: 16400, vehiclesRented: 6, occupancyRate: 60 },
     { label: "Mars 2026",     startLabel: "01/03", endLabel: "31/03", revenue: 19500, vehiclesRented: 7, occupancyRate: 72 },
   ],
   FLEXIRENT: [
-    { label: "Decembre 2025", startLabel: "01/12", endLabel: "31/12", revenue: 12200, vehiclesRented: 4, occupancyRate: 62 },
+    { label: "Décembre 2025", startLabel: "01/12", endLabel: "31/12", revenue: 12200, vehiclesRented: 4, occupancyRate: 62 },
     { label: "Janvier 2026",  startLabel: "01/01", endLabel: "31/01", revenue: 13400, vehiclesRented: 5, occupancyRate: 71 },
-    { label: "Fevrier 2026",  startLabel: "01/02", endLabel: "28/02", revenue: 13400, vehiclesRented: 4, occupancyRate: 67 },
+    { label: "Février 2026",  startLabel: "01/02", endLabel: "28/02", revenue: 13400, vehiclesRented: 4, occupancyRate: 67 },
     { label: "Mars 2026",     startLabel: "01/03", endLabel: "31/03", revenue: 15200, vehiclesRented: 5, occupancyRate: 77 },
   ],
 };
@@ -47,7 +47,7 @@ const AGENCY_PERIODS: Record<AgencyBrand, PeriodData[]> = {
 
 const agencyLabels: Record<Agency, string> = {
   ALL: "Toutes",
-  CITRON_LOCATION: "Citron location",
+  CITRON_LOCATION: "Citron Location",
   FLEXIRENT: "Flexirent",
 };
 
@@ -113,7 +113,7 @@ function PeriodSelector({
         className="overview-period-nav"
         disabled={index === 0}
         onClick={() => onChange(index - 1)}
-        aria-label="Periode precedente"
+        aria-label="Période précédente"
       >
         ‹
       </button>
@@ -123,7 +123,7 @@ function PeriodSelector({
         className="overview-period-nav"
         disabled={index === periods.length - 1}
         onClick={() => onChange(index + 1)}
-        aria-label="Periode suivante"
+        aria-label="Période suivante"
       >
         ›
       </button>
@@ -149,7 +149,7 @@ function KpiGrid({
   return (
     <div className={`grid gap-2 ${compact ? "grid-cols-2" : "sm:grid-cols-3"}`}>
       <article className="card bg-card-secondary px-3 py-2">
-        <p className="text-xs text-muted">CA sur la periode</p>
+        <p className="text-xs text-muted">CA sur la période</p>
         <p className={`mt-0.5 ${textSize} font-semibold leading-tight`}>
           {formatMoney(current.revenue)}
         </p>
@@ -159,12 +159,12 @@ function KpiGrid({
       </article>
 
       <article className="card bg-card-secondary px-3 py-2">
-        <p className="text-xs text-muted">Variation CA</p>
+        <p className="text-xs text-muted">Variation du CA</p>
         <p className={`mt-0.5 ${textSize} font-semibold leading-tight ${variationColor}`}>
           {variationText}
         </p>
         <p className="text-xs text-muted leading-tight">
-          {previous ? `vs ${previous.label}` : "Pas de periode precedente"}
+          {previous ? `vs ${previous.label}` : "Pas de période précédente"}
         </p>
       </article>
 
@@ -179,11 +179,11 @@ function KpiGrid({
       </article>
 
       <article className={`card bg-card-secondary px-3 py-2 ${compact ? "" : "sm:col-span-3 sm:max-w-[calc(33.333%-0.33rem)]"}`}>
-        <p className="text-xs text-muted">Vehicules loues</p>
+        <p className="text-xs text-muted">Véhicules loués</p>
         <p className={`mt-0.5 ${textSize} font-semibold leading-tight`}>
           {current.vehiclesRented}
         </p>
-        <p className="text-xs text-muted leading-tight">sur la periode</p>
+        <p className="text-xs text-muted leading-tight">sur la période</p>
       </article>
     </div>
   );
@@ -210,7 +210,7 @@ function FleetStatus({
         </p>
       </div>
       <div className="card bg-card-secondary px-3 py-1.5 text-center">
-        <p className="text-xs text-muted">Loues</p>
+        <p className="text-xs text-muted">Loués</p>
         <p className={`${textSize} font-semibold leading-tight`}>
           {fleetLoading ? "–" : fleetByStatus.reserved}
         </p>
@@ -249,17 +249,23 @@ export function OverviewPanel({
   const previousPeriod = safeIndex > 0 ? periods[safeIndex - 1] : null;
   const fleetByStatus = computeFleetByStatus(fleetVehicles, selectedAgency);
 
+  const handleAgencyChange = (a: Agency) => {
+    setSelectedAgency(a);
+    setPeriodIndex(getPeriodsForAgency(a).length - 1);
+  };
+
   const header = (
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted capitalize">
           {today}
         </p>
-        <h2 className="mt-0.5 text-xl font-semibold tracking-tight">
-          Vue d&apos;ensemble
-        </h2>
+        <div className="overview-title-row">
+          <h2 className="text-xl font-semibold tracking-tight">Vue d&apos;ensemble</h2>
+          <PeriodSelector periods={periods} index={safeIndex} onChange={setPeriodIndex} />
+        </div>
       </div>
-      <span className="chip">2 agences</span>
+      <AgencyFilter selected={selectedAgency} onChange={handleAgencyChange} />
     </div>
   );
 
@@ -267,8 +273,6 @@ export function OverviewPanel({
     return (
       <>
         {header}
-        <AgencyFilter selected={selectedAgency} onChange={(a) => { setSelectedAgency(a); setPeriodIndex(getPeriodsForAgency(a).length - 1); }} />
-        <PeriodSelector periods={periods} index={safeIndex} onChange={setPeriodIndex} />
         <KpiGrid current={currentPeriod} previous={previousPeriod} compact />
         <div className="mt-2">
           <FleetStatus fleetByStatus={fleetByStatus} fleetLoading={fleetLoading} compact />
@@ -280,14 +284,6 @@ export function OverviewPanel({
   return (
     <div className="flex min-h-0 flex-col gap-2">
       {header}
-      <AgencyFilter
-        selected={selectedAgency}
-        onChange={(a) => {
-          setSelectedAgency(a);
-          setPeriodIndex(getPeriodsForAgency(a).length - 1);
-        }}
-      />
-      <PeriodSelector periods={periods} index={safeIndex} onChange={setPeriodIndex} />
       <KpiGrid current={currentPeriod} previous={previousPeriod} compact={false} />
       <FleetStatus fleetByStatus={fleetByStatus} fleetLoading={fleetLoading} compact={false} />
       {openclawStatus !== undefined && (
@@ -297,7 +293,7 @@ export function OverviewPanel({
               ? "Openclaw actif"
               : openclawStatus === "offline"
                 ? "Openclaw hors ligne"
-                : "Openclaw en verification..."}
+                : "Openclaw en vérification..."}
           </span>
         </div>
       )}

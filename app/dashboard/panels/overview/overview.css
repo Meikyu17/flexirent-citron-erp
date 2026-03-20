@@ -1,5 +1,13 @@
 /* OverviewPanel — uses global classes: .card, .chip, .vehicle-toggle */
 
+.overview-title-row {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .overview-period-selector {
   display: inline-flex;
   align-items: center;

@@ -1,7 +1,6 @@
 export type SplitLayout = {
   desktopMain: number;
   desktopLeftTop: number;
-  desktopLeftPerf: number;
   desktopBottom: number;
   desktopRightTop: number;
   tabletMain: number;
@@ -20,12 +19,11 @@ export type ResizeState = {
   size: number;
 };
 
-export const LAYOUT_STORAGE_KEY = "citron-home-split-layout-v4";
+export const LAYOUT_STORAGE_KEY = "citron-home-split-layout-v7";
 
 export const defaultLayout: SplitLayout = {
   desktopMain: 0.62,
   desktopLeftTop: 0.34,
-  desktopLeftPerf: 0.40,
   desktopBottom: 0.48,
   desktopRightTop: 0.62,
   tabletMain: 0.52,
@@ -37,7 +35,6 @@ export const defaultLayout: SplitLayout = {
 export const splitLimits: Record<SplitKey, { min: number; max: number }> = {
   desktopMain: { min: 0.42, max: 0.72 },
   desktopLeftTop: { min: 0.18, max: 0.52 },
-  desktopLeftPerf: { min: 0.22, max: 0.58 },
   desktopBottom: { min: 0.32, max: 0.68 },
   desktopRightTop: { min: 0.38, max: 0.75 },
   tabletMain: { min: 0.42, max: 0.62 },
@@ -59,11 +56,6 @@ export const sanitizeLayout = (candidate?: Partial<SplitLayout>): SplitLayout =>
     candidate?.desktopLeftTop ?? defaultLayout.desktopLeftTop,
     splitLimits.desktopLeftTop.min,
     splitLimits.desktopLeftTop.max,
-  ),
-  desktopLeftPerf: clamp(
-    candidate?.desktopLeftPerf ?? defaultLayout.desktopLeftPerf,
-    splitLimits.desktopLeftPerf.min,
-    splitLimits.desktopLeftPerf.max,
   ),
   desktopBottom: clamp(
     candidate?.desktopBottom ?? defaultLayout.desktopBottom,

@@ -72,52 +72,31 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--border));
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--card) 96%, white),
-    color-mix(in srgb, var(--card-secondary) 88%, var(--card))
-  );
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, var(--border));
+  background: var(--card-secondary);
   color: var(--danger);
-  border-radius: 0.9rem;
-  min-height: 2.35rem;
-  padding: 0.5rem 0.95rem;
+  border-radius: 0.65rem;
+  min-height: 2.2rem;
+  padding: 0.45rem 0.9rem;
   font-size: 0.83rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 55%, transparent),
-    0 8px 18px -16px color-mix(in srgb, var(--danger) 35%, transparent);
-  transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    transform 140ms ease;
+  transition: background 120ms ease, border-color 120ms ease;
 }
 
 .nav-button-danger:hover {
-  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--danger) 8%, var(--card)),
-    color-mix(in srgb, var(--danger) 5%, var(--card-secondary))
-  );
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 45%, transparent),
-    0 14px 24px -18px color-mix(in srgb, var(--danger) 45%, transparent);
+  background: color-mix(in srgb, var(--danger) 7%, var(--card-secondary));
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
 }
 
 .nav-button-danger:focus-visible {
   outline: none;
-  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
-  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--danger) 16%, transparent);
+  border-color: var(--danger);
 }
 
 .nav-button-danger:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
-  transform: none;
 }
 
 .chip {
@@ -139,79 +118,40 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--border) 82%, var(--foreground));
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--card) 96%, white),
-    color-mix(in srgb, var(--card-secondary) 88%, var(--card))
-  );
+  border: 1px solid var(--border);
+  background: var(--card-secondary);
   color: var(--foreground);
-  border-radius: 0.9rem;
-  min-height: 2.35rem;
-  padding: 0.5rem 0.95rem;
+  border-radius: 0.65rem;
+  min-height: 2.2rem;
+  padding: 0.45rem 0.9rem;
   font-size: 0.83rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 55%, transparent),
-    0 8px 18px -16px color-mix(in srgb, var(--foreground) 45%, transparent);
-  transition:
-    background-color 140ms ease,
-    border-color 140ms ease,
-    color 140ms ease,
-    box-shadow 140ms ease,
-    transform 140ms ease;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .vehicle-toggle:hover,
 .vehicle-status-button:hover {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent-soft) 74%, var(--card)),
-    color-mix(in srgb, var(--accent-soft) 42%, var(--card-secondary))
-  );
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 45%, transparent),
-    0 14px 24px -18px color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--border) 35%, var(--card-secondary));
+  border-color: color-mix(in srgb, var(--foreground) 18%, var(--border));
 }
 
 .vehicle-toggle:focus-visible,
 .vehicle-status-button:focus-visible {
   outline: none;
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--accent);
 }
 
 .vehicle-toggle-active {
-  border-color: color-mix(in srgb, var(--accent) 72%, var(--border));
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent-soft) 94%, var(--card)),
-    color-mix(in srgb, var(--accent-soft) 74%, var(--card-secondary))
-  );
-  color: color-mix(in srgb, var(--foreground) 72%, var(--accent));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent),
-    0 16px 28px -20px color-mix(in srgb, var(--accent) 60%, transparent);
-}
-
-.vehicle-status-button {
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--card-secondary));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
 }
 
 .vehicle-status-button-active {
-  border-color: color-mix(in srgb, var(--accent) 74%, var(--border));
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent-soft) 92%, var(--card)),
-    color-mix(in srgb, var(--accent-soft) 72%, var(--card-secondary))
-  );
-  color: color-mix(in srgb, var(--foreground) 72%, var(--accent));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent),
-    0 16px 28px -20px color-mix(in srgb, var(--accent) 60%, transparent);
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--card-secondary));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
 }
 
 

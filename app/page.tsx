@@ -29,7 +29,7 @@ import {
   type ResizeState,
   type SplitKey,
   type SplitLayout,
-} from "./dashboard/layout/layout";
+} from "./dashboard/layout/split-layout";
 import { Splitter } from "./dashboard/layout/Splitter";
 import { OverviewPanel } from "./dashboard/panels/overview/OverviewPanel";
 import { VehiclePanel } from "./dashboard/panels/vehicles/VehiclePanel";
@@ -42,85 +42,117 @@ const bookings: BookingItem[] = [
   {
     id: "R-2191",
     date: "2026-03-21",
+    type: "PICKUP",
     client: "Dominique D.",
     pickup: "Jean-Jaurès / 15h30",
     dropoff: "Jean-Jaurès / 20h30",
+    dropoffDate: "2026-03-21",
     car: "Citroen C3 Grise",
+    plateNumber: "AB-421-CD",
     amount: 132,
     source: "Fleetee A",
+    agency: "CITRON_LOCATION",
   },
   {
     id: "R-2193",
     date: "2026-03-21",
+    type: "RETURN",
     client: "Sabrina M.",
     pickup: "Citron Centre / 09h15",
     dropoff: "Citron Centre / 17h00",
+    dropoffDate: "2026-03-21",
     car: "Peugeot 206 Bleue",
+    plateNumber: "EF-087-GH",
     amount: 94,
     source: "Getaround",
+    agency: "CITRON_LOCATION",
   },
   {
     id: "R-2198",
     date: "2026-03-21",
+    type: "PICKUP",
     client: "Jean D.",
     pickup: "Jean-Jaurès / 13h45",
     dropoff: "Jean-Jaurès / 18h45",
+    dropoffDate: "2026-03-23",
     car: "Citroen C3 Grise",
+    plateNumber: "IJ-654-KL",
     amount: 121,
     source: "Fleetee B",
+    agency: "FLEXIRENT",
   },
   // — Samedi 22 mars —
   {
     id: "R-2201",
     date: "2026-03-22",
+    type: "RETURN",
     client: "Marie L.",
     pickup: "Citron Centre / 08h30",
     dropoff: "Citron Centre / 12h00",
+    dropoffDate: "2026-03-22",
     car: "Renault Clio Blanche",
+    plateNumber: "MN-302-OP",
     amount: 58,
     source: "Fleetee A",
+    agency: "CITRON_LOCATION",
   },
   {
     id: "R-2202",
     date: "2026-03-22",
+    type: "PICKUP",
     client: "Pierre K.",
     pickup: "Jean-Jaurès / 14h00",
     dropoff: "Jean-Jaurès / 19h30",
+    dropoffDate: "2026-03-25",
     car: "Peugeot 208 Noire",
+    plateNumber: "QR-118-ST",
     amount: 87,
     source: "Getaround",
+    agency: "FLEXIRENT",
   },
   // — Lundi 24 mars —
   {
     id: "R-2205",
     date: "2026-03-24",
+    type: "PICKUP",
     client: "Thomas B.",
     pickup: "Citron Centre / 10h00",
     dropoff: "Citron Centre / 18h00",
+    dropoffDate: "2026-03-24",
     car: "Citroen C3 Grise",
+    plateNumber: "UV-773-WX",
     amount: 110,
     source: "Fleetee B",
+    agency: "FLEXIRENT",
   },
   {
     id: "R-2206",
     date: "2026-03-24",
+    type: "RETURN",
     client: "Claire M.",
     pickup: "Jean-Jaurès / 16h30",
     dropoff: "Jean-Jaurès / 20h00",
+    dropoffDate: "2026-03-24",
     car: "Renault Clio Blanche",
+    plateNumber: "YZ-540-AA",
     amount: 64,
     source: "Turo",
+    agency: "FLEXIRENT",
   },
   // — Mercredi 26 mars —
   {
     id: "R-2210",
     date: "2026-03-26",
+    type: "RETURN",
     client: "Antoine R.",
     pickup: "Citron Centre / 09h00",
     dropoff: "Citron Centre / 17h30",
+    dropoffDate: "2026-03-28",
     car: "Peugeot 206 Bleue",
+    plateNumber: "BB-215-CC",
     amount: 145,
     source: "Fleetee A",
+    agency: "CITRON_LOCATION",
   },
 ];
 
@@ -130,7 +162,7 @@ const initialDispatches: DispatchItem[] = [
     bookingRef: "R-2198",
     mission: "Jeudi 14 Janvier / Jean-Jaurès / 13h45",
     members: ["Nathan", "Adrian", "Aimery", "Louise"],
-    state: "A dispatcher",
+    state: "À assigner",
   },
   {
     id: "D-11",
@@ -147,6 +179,29 @@ const employeeStats: EmployeeStat[] = [
   { name: "Adrian", handovers: 16, returns: 17 },
   { name: "Aimery", handovers: 14, returns: 15 },
 ];
+
+function formatScrapeElapsed(lastScrapeAt: string | null, now: number): string {
+  if (!lastScrapeAt) return "jamais";
+
+  const ts = Date.parse(lastScrapeAt);
+  if (Number.isNaN(ts)) return "inconnu";
+
+  const elapsedMs = Math.max(0, now - ts);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (elapsedMs < minute) return "moins d'1 min";
+  if (elapsedMs < hour) return `${Math.floor(elapsedMs / minute)} min`;
+  if (elapsedMs < day) return `${Math.floor(elapsedMs / hour)} h`;
+  if (elapsedMs < 7 * day) return `${Math.floor(elapsedMs / day)} j`;
+
+  return new Date(ts).toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
 
 export default function Home() {
   const router = useRouter();
@@ -170,10 +225,14 @@ export default function Home() {
   const [fleetError, setFleetError] = useState<string | null>(null);
   const [savingVehicleId, setSavingVehicleId] = useState<string | null>(null);
   const [openclawStatus, setOpenclawStatus] = useState<OpenclawPingStatus>("checking");
+  const [lastOpenclawScrapeAt, setLastOpenclawScrapeAt] = useState<string | null>(
+    null,
+  );
+  const [relativeNow, setRelativeNow] = useState(Date.now());
   const [parkingOptions, setParkingOptions] = useState<ParkingOptions>({ areas: [], spots: [] });
   const [dispatchItems, setDispatchItems] = useState<DispatchItem[]>(initialDispatches);
   const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
-  const [dispatchFilter, setDispatchFilter] = useState<"A dispatcher" | "Assigné" | null>(null);
+  const [dispatchFilter, setDispatchFilter] = useState<"À assigner" | "Assigné" | null>(null);
 
 
 
@@ -234,14 +293,14 @@ export default function Home() {
         const response = await fetch("/api/vehicles", { cache: "no-store" });
         const payload = (await response.json()) as { ok: boolean; error?: string; vehicles?: FleetVehicle[] };
         if (!response.ok || !payload.ok || !payload.vehicles) {
-          throw new Error(payload.error ?? "Chargement vehicules impossible");
+          throw new Error(payload.error ?? "Chargement des véhicules impossible");
         }
         if (cancelled) return;
         setFleetVehicles(payload.vehicles);
         setVehicleDrafts(makeVehicleDrafts(payload.vehicles));
       } catch (error) {
         if (cancelled) return;
-        setFleetError(error instanceof Error ? error.message : "Chargement vehicules impossible");
+        setFleetError(error instanceof Error ? error.message : "Chargement des véhicules impossible");
       } finally {
         if (!cancelled) setFleetLoading(false);
       }
@@ -269,9 +328,23 @@ export default function Home() {
     let cancelled = false;
     const ping = async () => {
       try {
-        const response = await fetch("/api/openclaw/events", { method: "GET", cache: "no-store" });
+        const response = await fetch("/api/openclaw/status", {
+          method: "GET",
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as {
+          ok: boolean;
+          lastScrapeAt?: string | null;
+        };
+
         if (cancelled) return;
-        setOpenclawStatus(response.ok ? "online" : "offline");
+        if (!response.ok || !payload.ok) {
+          setOpenclawStatus("offline");
+          return;
+        }
+
+        setOpenclawStatus("online");
+        setLastOpenclawScrapeAt(payload.lastScrapeAt ?? null);
       } catch {
         if (!cancelled) setOpenclawStatus("offline");
       }
@@ -279,6 +352,11 @@ export default function Home() {
     void ping();
     const intervalId = window.setInterval(() => void ping(), 15000);
     return () => { cancelled = true; window.clearInterval(intervalId); };
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setRelativeNow(Date.now()), 60_000);
+    return () => window.clearInterval(intervalId);
   }, []);
 
   // — Resize —
@@ -327,11 +405,6 @@ export default function Home() {
     }
   };
 
-  const resetLayout = () => {
-    setLayout(defaultLayout);
-    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(defaultLayout));
-  };
-
   const handleAssignOperator = (name: string) => {
     if (!selectedDispatchId) return;
     setDispatchItems((current) =>
@@ -339,7 +412,7 @@ export default function Home() {
         if (d.id !== selectedDispatchId) return d;
         const isAssigned = d.members.includes(name);
         const newMembers = isAssigned ? d.members.filter((m) => m !== name) : [...d.members, name];
-        return { ...d, members: newMembers, state: newMembers.length > 0 ? "Assigné" : "A dispatcher" };
+        return { ...d, members: newMembers, state: newMembers.length > 0 ? "Assigné" : "À assigner" };
       }),
     );
   };
@@ -395,7 +468,7 @@ export default function Home() {
       });
       const payload = (await response.json()) as { ok: boolean; error?: string; vehicle?: FleetVehicle };
       if (!response.ok || !payload.ok || !payload.vehicle) {
-        throw new Error(payload.error ?? "Mise a jour vehicule impossible");
+        throw new Error(payload.error ?? "Mise à jour du véhicule impossible");
       }
       const updatedVehicle = payload.vehicle;
       setFleetVehicles((current) =>
@@ -416,13 +489,12 @@ export default function Home() {
         spots: trimmedSpot && !prev.spots.includes(trimmedSpot) ? [...prev.spots, trimmedSpot].sort() : prev.spots,
       }));
     } catch (error) {
-      setFleetError(error instanceof Error ? error.message : "Mise a jour vehicule impossible");
+      setFleetError(error instanceof Error ? error.message : "Mise à jour du véhicule impossible");
     } finally {
       setSavingVehicleId(null);
     }
   };
 
-  const desktopLeftPerfBottom = 1 - layout.desktopLeftTop - layout.desktopLeftPerf;
   const desktopBottomRight = 1 - layout.desktopBottom;
   const tabletRightBottom = 1 - layout.tabletRightTop;
 
@@ -443,6 +515,7 @@ export default function Home() {
 
   const sharedDispatchPanelProps = {
     dispatchItems,
+    bookings,
     dispatchFilter,
     selectedDispatchId,
     operators,
@@ -476,18 +549,20 @@ export default function Home() {
               Profil
             </button>
             <button type="button" className="vehicle-toggle cursor-pointer">
-              Parametres
+              Paramètres
             </button>
 
             <span className="nav-divider" aria-hidden="true" />
 
-            <button
-              type="button"
-              className="vehicle-toggle cursor-pointer"
-              onClick={resetLayout}
-            >
-              Reinitialiser l&apos;agencement
-            </button>
+            <span className="chip">
+              Scraping Openclaw:{" "}
+              {openclawStatus === "offline"
+                ? "indisponible"
+                : `il y a ${formatScrapeElapsed(lastOpenclawScrapeAt, relativeNow)}`}
+            </span>
+
+            <span className="nav-divider" aria-hidden="true" />
+
             <button
               type="button"
               className="vehicle-toggle cursor-pointer"
@@ -504,7 +579,7 @@ export default function Home() {
               onClick={handleLogout}
               disabled={loggingOut}
             >
-              {loggingOut ? "Sortie..." : "Deconnexion"}
+              {loggingOut ? "Sortie..." : "Déconnexion"}
             </button>
           </div>
         </div>
@@ -519,7 +594,7 @@ export default function Home() {
               ref={desktopLeftRef}
               className="split-column"
               style={{
-                gridTemplateRows: `minmax(min-content, ${layout.desktopLeftTop}fr) 0.6rem minmax(min-content, ${layout.desktopLeftPerf}fr) 0.6rem minmax(min-content, ${desktopLeftPerfBottom}fr)`,
+                gridTemplateRows: `minmax(min-content, ${layout.desktopLeftTop}fr) 0.6rem minmax(min-content, ${1 - layout.desktopLeftTop}fr)`,
               }}
             >
               <article className="dashboard-panel card p-3 md:p-4">
@@ -543,24 +618,19 @@ export default function Home() {
 
                 <Splitter
                   axis="x"
-                  label="Redimensionner entre Vehicules et Dispatch"
+                  label="Redimensionner entre Véhicules et Dispatch"
                   onPointerDown={(event) => startResize(event, "desktopBottom", "x", desktopBottomRef.current)}
                 />
 
-                <article className="dashboard-panel card p-4">
-                  <DispatchPanel {...sharedDispatchPanelProps} />
-                </article>
+                <div className="flex min-h-0 flex-col gap-[0.6rem]">
+                  <article className="dashboard-panel card flex-1 p-4">
+                    <DispatchPanel {...sharedDispatchPanelProps} />
+                  </article>
+                  <article className="dashboard-panel card shrink-0 p-4">
+                    <PerformancePanel employees={employeeStats} size="compact" />
+                  </article>
+                </div>
               </div>
-
-              <Splitter
-                axis="y"
-                label="Redimensionner entre Dispatch et Performance equipe"
-                onPointerDown={(event) => startResize(event, "desktopLeftPerf", "y", desktopLeftRef.current)}
-              />
-
-              <article className="dashboard-panel card p-4">
-                <PerformancePanel employees={employeeStats} size="full" />
-              </article>
             </div>
 
             <Splitter
