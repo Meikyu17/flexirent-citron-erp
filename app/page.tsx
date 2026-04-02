@@ -14,12 +14,8 @@ import type {
   BookingItem,
   DispatchItem,
   EmployeeStat,
-  FleetVehicle,
   OpenclawPingStatus,
-  ParkingOptions,
-  VehicleDraft,
 } from "./dashboard/shared/types";
-import { makeVehicleDrafts } from "./dashboard/shared/utils";
 import {
   clamp,
   defaultLayout,
@@ -34,7 +30,6 @@ import {
 import { Splitter } from "./dashboard/layout/Splitter";
 import Link from "next/link";
 import { OverviewPanel } from "./dashboard/panels/overview/OverviewPanel";
-import { VehiclePanel } from "./dashboard/panels/vehicles/VehiclePanel";
 import { DispatchPanel } from "./dashboard/panels/dispatch/DispatchPanel";
 import { ReservationsPanel } from "./dashboard/panels/reservations/ReservationsPanel";
 import { PerformancePanel } from "./dashboard/panels/performance/PerformancePanel";
@@ -54,6 +49,11 @@ type BackofficeReservationLog = {
   customerName: string | null;
   agencyBrand: AgencyBrand;
   platform: "GETAROUND" | "FLEETEE" | "TURO" | "DIRECT" | null;
+};
+
+type OverviewFleetVehicle = {
+  operationalStatus: "AVAILABLE" | "RESERVED" | "IN_RENT" | "OUT_OF_SERVICE";
+  agency: { brand: AgencyBrand };
 };
 
 function toLocalIsoDate(date: Date): string {
@@ -138,7 +138,6 @@ export default function Home() {
   const router = useRouter();
   const desktopRootRef = useRef<HTMLDivElement>(null);
   const desktopLeftRef = useRef<HTMLDivElement>(null);
-  const desktopBottomRef = useRef<HTMLDivElement>(null);
   const desktopRightRef = useRef<HTMLDivElement>(null);
   const tabletRootRef = useRef<HTMLDivElement>(null);
   const tabletLeftRef = useRef<HTMLDivElement>(null);
@@ -149,18 +148,13 @@ export default function Home() {
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [loggingOut, setLoggingOut] = useState(false);
-  const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
-  const [vehicleDrafts, setVehicleDrafts] = useState<Record<string, VehicleDraft>>({});
-  const [selectedBrand, setSelectedBrand] = useState<"ALL" | AgencyBrand>("ALL");
-  const [fleetLoading, setFleetLoading] = useState(true);
-  const [fleetError, setFleetError] = useState<string | null>(null);
-  const [savingVehicleId, setSavingVehicleId] = useState<string | null>(null);
+  const [overviewFleetVehicles, setOverviewFleetVehicles] = useState<OverviewFleetVehicle[]>([]);
+  const [overviewFleetLoading, setOverviewFleetLoading] = useState(true);
   const [openclawStatus, setOpenclawStatus] = useState<OpenclawPingStatus>("checking");
   const [lastOpenclawScrapeAt, setLastOpenclawScrapeAt] = useState<string | null>(
     null,
   );
   const [relativeNow, setRelativeNow] = useState(Date.now());
-  const [parkingOptions, setParkingOptions] = useState<ParkingOptions>({ areas: [], spots: [] });
   const [dispatchItems, setDispatchItems] = useState<DispatchItem[]>(initialDispatches);
   const [backofficeBookings, setBackofficeBookings] = useState<BookingItem[]>([]);
   const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
@@ -173,10 +167,6 @@ export default function Home() {
     day: "numeric",
     month: "long",
   });
-
-  const visibleVehicles = fleetVehicles.filter(
-    (vehicle) => selectedBrand === "ALL" || vehicle.agency.brand === selectedBrand,
-  );
 
   const operators = employeeStats.map((e) => e.name);
   const dashboardBookings = useMemo(() => {
@@ -221,30 +211,35 @@ export default function Home() {
     localStorage.setItem("citron-theme", theme);
   }, [theme]);
 
-  // — Fleet loading —
   useEffect(() => {
     let cancelled = false;
-    const loadVehicles = async () => {
-      setFleetLoading(true);
-      setFleetError(null);
+
+    const loadOverviewFleet = async (setLoading: boolean) => {
+      if (setLoading) setOverviewFleetLoading(true);
       try {
-        const response = await fetch("/api/vehicles", { cache: "no-store" });
-        const payload = (await response.json()) as { ok: boolean; error?: string; vehicles?: FleetVehicle[] };
+        const response = await fetch("/api/backoffice/vehicles", { cache: "no-store" });
+        const payload = (await response.json()) as {
+          ok: boolean;
+          vehicles?: OverviewFleetVehicle[];
+        };
         if (!response.ok || !payload.ok || !payload.vehicles) {
-          throw new Error(payload.error ?? "Chargement des véhicules impossible");
+          throw new Error("Chargement des statuts de flotte impossible");
         }
         if (cancelled) return;
-        setFleetVehicles(payload.vehicles);
-        setVehicleDrafts(makeVehicleDrafts(payload.vehicles));
-      } catch (error) {
-        if (cancelled) return;
-        setFleetError(error instanceof Error ? error.message : "Chargement des véhicules impossible");
+        setOverviewFleetVehicles(payload.vehicles);
+      } catch {
+        if (!cancelled) setOverviewFleetVehicles([]);
       } finally {
-        if (!cancelled) setFleetLoading(false);
+        if (!cancelled && setLoading) setOverviewFleetLoading(false);
       }
     };
-    void loadVehicles();
-    return () => { cancelled = true; };
+
+    void loadOverviewFleet(true);
+    const intervalId = window.setInterval(() => void loadOverviewFleet(false), 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   useEffect(() => {
@@ -272,20 +267,6 @@ export default function Home() {
 
     void loadBackofficeReservations();
     return () => { cancelled = true; };
-  }, []);
-
-  // — Parking options —
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const response = await fetch("/api/vehicles/parking-options", { cache: "no-store" });
-        const payload = (await response.json()) as { ok: boolean; areas?: string[]; spots?: string[] };
-        if (response.ok && payload.ok) {
-          setParkingOptions({ areas: payload.areas ?? [], spots: payload.spots ?? [] });
-        }
-      } catch { /* non-critical */ }
-    };
-    void load();
   }, []);
 
   // — Openclaw ping —
@@ -381,102 +362,7 @@ export default function Home() {
       }),
     );
   };
-
-  const handleVehicleDraftChange = (vehicleId: string, patch: Partial<VehicleDraft>) => {
-    setVehicleDrafts((current) => ({
-      ...current,
-      [vehicleId]: { ...current[vehicleId], ...patch },
-    }));
-  };
-
-  const handleAddParkingArea = async (value: string) => {
-    if (parkingOptions.areas.includes(value)) return;
-    try {
-      const response = await fetch("/api/vehicles/parking-options", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "AREA", value }),
-      });
-      if (response.ok) {
-        setParkingOptions((prev) => ({ ...prev, areas: [...prev.areas, value].sort() }));
-      }
-    } catch { /* silently ignore */ }
-  };
-
-  const handleDeleteParkingArea = async (value: string) => {
-    try {
-      const response = await fetch("/api/vehicles/parking-options", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "AREA", value }),
-      });
-      if (response.ok) {
-        setParkingOptions((prev) => ({ ...prev, areas: prev.areas.filter((a) => a !== value) }));
-      }
-    } catch { /* silently ignore */ }
-  };
-
-  const handleVehicleSave = async (vehicleId: string) => {
-    const draft = vehicleDrafts[vehicleId];
-    if (!draft) return;
-    setSavingVehicleId(vehicleId);
-    setFleetError(null);
-    try {
-      const response = await fetch(`/api/vehicles/${vehicleId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          parkingArea: draft.parkingArea.trim(),
-          parkingSpot: draft.parkingSpot.trim(),
-          operationalStatus: draft.operationalStatus,
-        }),
-      });
-      const payload = (await response.json()) as { ok: boolean; error?: string; vehicle?: FleetVehicle };
-      if (!response.ok || !payload.ok || !payload.vehicle) {
-        throw new Error(payload.error ?? "Mise à jour du véhicule impossible");
-      }
-      const updatedVehicle = payload.vehicle;
-      setFleetVehicles((current) =>
-        current.map((vehicle) => vehicle.id === vehicleId ? updatedVehicle : vehicle),
-      );
-      setVehicleDrafts((current) => ({
-        ...current,
-        [vehicleId]: {
-          parkingArea: updatedVehicle.parkingArea,
-          parkingSpot: updatedVehicle.parkingSpot,
-          operationalStatus: updatedVehicle.operationalStatus,
-        },
-      }));
-      const trimmedArea = updatedVehicle.parkingArea;
-      const trimmedSpot = updatedVehicle.parkingSpot;
-      setParkingOptions((prev) => ({
-        areas: trimmedArea && !prev.areas.includes(trimmedArea) ? [...prev.areas, trimmedArea].sort() : prev.areas,
-        spots: trimmedSpot && !prev.spots.includes(trimmedSpot) ? [...prev.spots, trimmedSpot].sort() : prev.spots,
-      }));
-    } catch (error) {
-      setFleetError(error instanceof Error ? error.message : "Mise à jour du véhicule impossible");
-    } finally {
-      setSavingVehicleId(null);
-    }
-  };
-
-  const desktopBottomRight = 1 - layout.desktopBottom;
   const tabletRightBottom = 1 - layout.tabletRightTop;
-
-  const sharedVehiclePanelProps = {
-    vehicles: visibleVehicles,
-    drafts: vehicleDrafts,
-    selectedBrand,
-    fleetLoading,
-    fleetError,
-    savingVehicleId,
-    parkingOptions,
-    onBrandChange: setSelectedBrand,
-    onDraftChange: handleVehicleDraftChange,
-    onSave: handleVehicleSave,
-    onAddParkingArea: handleAddParkingArea,
-    onDeleteParkingArea: handleDeleteParkingArea,
-  };
 
   const sharedDispatchPanelProps = {
     dispatchItems,
@@ -491,9 +377,8 @@ export default function Home() {
 
   const overviewProps = {
     today,
-    fleetVehicles,
-    fleetLoading,
-    openclawStatus,
+    fleetVehicles: overviewFleetVehicles,
+    fleetLoading: overviewFleetLoading,
   };
 
   return (
@@ -575,29 +460,13 @@ export default function Home() {
                 onPointerDown={(event) => startResize(event, "desktopLeftTop", "y", desktopLeftRef.current)}
               />
 
-              <div
-                ref={desktopBottomRef}
-                className="split-row"
-                style={{ gridTemplateColumns: `minmax(min-content, ${layout.desktopBottom}fr) 0.6rem minmax(min-content, ${desktopBottomRight}fr)` }}
-              >
-                <article className="dashboard-panel card p-4">
-                  <VehiclePanel {...sharedVehiclePanelProps} />
+              <div className="flex min-h-0 flex-col gap-[0.6rem]">
+                <article className="dashboard-panel card flex-1 p-4">
+                  <DispatchPanel {...sharedDispatchPanelProps} />
                 </article>
-
-                <Splitter
-                  axis="x"
-                  label="Redimensionner entre Véhicules et Dispatch"
-                  onPointerDown={(event) => startResize(event, "desktopBottom", "x", desktopBottomRef.current)}
-                />
-
-                <div className="flex min-h-0 flex-col gap-[0.6rem]">
-                  <article className="dashboard-panel card flex-1 p-4">
-                    <DispatchPanel {...sharedDispatchPanelProps} />
-                  </article>
-                  <article className="dashboard-panel card shrink-0 p-4">
-                    <PerformancePanel employees={employeeStats} size="compact" />
-                  </article>
-                </div>
+                <article className="dashboard-panel card shrink-0 p-4">
+                  <PerformancePanel employees={employeeStats} size="compact" />
+                </article>
               </div>
             </div>
 
@@ -621,7 +490,7 @@ export default function Home() {
             <div
               ref={tabletLeftRef}
               className="split-column"
-              style={{ gridTemplateRows: "auto 0.6rem minmax(min-content, 1fr) 0.6rem minmax(min-content, 1fr)" }}
+              style={{ gridTemplateRows: "auto 0.6rem minmax(min-content, 1fr)" }}
             >
               <article className="dashboard-panel card p-3 md:p-4">
                 <OverviewPanel {...overviewProps} size="full" />
@@ -629,18 +498,8 @@ export default function Home() {
 
               <Splitter
                 axis="y"
-                label="Redimensionner entre Vue d'ensemble et Vehicules"
+                label="Redimensionner entre Vue d'ensemble et Dispatch"
                 onPointerDown={(event) => startResize(event, "tabletLeftTop", "y", tabletLeftRef.current)}
-              />
-
-              <article className="dashboard-panel card p-4">
-                <VehiclePanel {...sharedVehiclePanelProps} />
-              </article>
-
-              <Splitter
-                axis="y"
-                label="Redimensionner entre Vehicules et Dispatch"
-                onPointerDown={(event) => startResize(event, "tabletLeftMiddle", "y", tabletLeftRef.current)}
               />
 
               <article className="dashboard-panel card p-4">
@@ -683,10 +542,6 @@ export default function Home() {
 
             <article className="dashboard-panel card panel-priority p-4">
               <ReservationsPanel bookings={dashboardBookings} size="compact" />
-            </article>
-
-            <article className="dashboard-panel card p-4">
-              <VehiclePanel {...sharedVehiclePanelProps} />
             </article>
 
             <article className="dashboard-panel card p-4">
