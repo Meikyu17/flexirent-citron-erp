@@ -23,7 +23,6 @@
  *   FLEETEE_HEADLESS=false         Affiche le navigateur (utile pour déboguer)
  */
 
-import "dotenv/config";
 import { chromium } from "playwright";
 import { PrismaClient, AgencyBrand, ReservationSource } from "@prisma/client";
 import { readFile, unlink, mkdir } from "fs/promises";
@@ -176,53 +175,94 @@ function parseAmountCents(raw) {
   return isNaN(euros) ? 0 : Math.round(euros * 100);
 }
 
-// ─── Helper : télécharger un export depuis une page Fleetee ──────────────────
+// ─── Étapes 1-4 : déclencher la génération d'un export ───────────────────────
+// Ne télécharge pas — Fleetee génère le fichier de façon asynchrone.
 
-async function downloadExport(page, account, label, downloadDir) {
-  const downloadPromise = page.waitForEvent("download", { timeout: 30_000 });
+async function triggerExport(page, account, label, downloadDir) {
+  const tag = `[Fleetee ${account.key}] ${label}`;
 
-  const exportSelectors = [
-    "button:has-text('Exporter la liste')",
-    "button:has-text('Exporter')",
-    "button:has-text('Export')",
-    "button:has-text('CSV')",
-    "button:has-text('Télécharger')",
-    "[aria-label*='Exporter' i]",
-    "[aria-label*='export' i]",
-    "[data-testid*='export' i]",
-  ];
+  // Étape 1 : "Exporter la liste"
+  const exportListBtn = page
+    .locator(".btn-secondary:has-text('Exporter la liste'), button:has-text('Exporter la liste')")
+    .first();
 
-  let clicked = false;
-  for (const sel of exportSelectors) {
-    const btn = page.locator(sel).first();
-    const visible = await btn.isVisible({ timeout: 2_000 }).catch(() => false);
-    if (visible) {
-      await btn.click();
-      clicked = true;
-      console.log(`[Fleetee ${account.key}] ${label} — bouton trouvé : "${sel}"`);
-      break;
-    }
-  }
-
-  if (!clicked) {
-    const screenshotPath = join(downloadDir, `debug-${label}.png`);
-    await page.screenshot({ path: screenshotPath, fullPage: true });
+  if (!(await exportListBtn.isVisible({ timeout: 8_000 }).catch(() => false))) {
+    const ss = join(downloadDir, `debug-${label}-1.png`);
+    await page.screenshot({ path: ss, fullPage: true });
     throw new Error(
-      `[Fleetee ${account.key}] ${label} — bouton d'export introuvable.\n` +
-        `Screenshot : ${screenshotPath}\n` +
-        `Relancez avec FLEETEE_HEADLESS=false pour identifier le bon sélecteur.`,
+      `${tag} — bouton "Exporter la liste" introuvable. Screenshot : ${ss}\n` +
+        `Relancez avec FLEETEE_HEADLESS=false pour déboguer.`,
     );
   }
+  await exportListBtn.click();
+  console.log(`${tag} — clic "Exporter la liste"`);
 
-  // Sous-menu CSV possible (CSV / XLS / PDF)
-  const csvOption = page.locator("[role='menuitem']:has-text('CSV'), li:has-text('CSV')").first();
-  const csvVisible = await csvOption.isVisible({ timeout: 2_000 }).catch(() => false);
-  if (csvVisible) await csvOption.click();
+  // Étape 2 : "Exporter les X éléments"
+  const exportAllBtn = page
+    .locator(".btn-link:has-text('Exporter les'), span:has-text('Exporter les')")
+    .first();
+  await exportAllBtn.waitFor({ state: "visible", timeout: 8_000 });
+  const exportAllText = await exportAllBtn.textContent();
+  console.log(`${tag} — clic "${exportAllText?.trim()}"`);
+  await exportAllBtn.click();
 
-  const download = await downloadPromise;
+  // Étape 3 : panneau "Réglages supplémentaires" — format via #format
+  const formatSelect = page.locator("#format");
+  await formatSelect.waitFor({ state: "visible", timeout: 8_000 });
+  await formatSelect.click();
+  console.log(`${tag} — sélecteur de format ouvert`);
+
+  const csvFormatOption = page
+    .locator("[role='listbox'] [role='option']:has-text('.csv'), [role='listbox'] li:has-text('.csv')")
+    .first();
+  await csvFormatOption.waitFor({ state: "visible", timeout: 5_000 });
+  await csvFormatOption.click();
+  console.log(`${tag} — format .csv sélectionné`);
+
+  // Étape 4 : "Lancer la génération" — génération asynchrone côté Fleetee
+  const generateBtn = page
+    .locator("button:has-text('Lancer la génération')")
+    .first();
+  await generateBtn.waitFor({ state: "visible", timeout: 5_000 });
+  await generateBtn.click();
+  console.log(`${tag} — génération lancée`);
+}
+
+// ─── Surveillance de ~/Downloads pour récupérer le fichier téléchargé ────────
+
+const EXPORT_WAIT_MS = 3 * 60 * 1000; // 3 minutes
+
+// ─── Attente + téléchargement depuis la page d'exports ───────────────────────
+
+async function downloadLatestExport(page, context, account, label, downloadDir) {
+  const tag = `[Fleetee ${account.key}] ${label}`;
+
+  // Attente de la génération côté serveur Fleetee
+  console.log(`${tag} — attente de la génération (3 min)...`);
+  await page.waitForTimeout(EXPORT_WAIT_MS);
+
+  // Navigation vers la liste des exports
+  const exportsUrl = `https://app.fleetee.io/${account.accountSlug}/exports/list?page=0&limit=20`;
+  console.log(`${tag} — navigation vers ${exportsUrl}`);
+  await page.goto(exportsUrl);
+  await page.waitForLoadState("networkidle");
+
+  // Clic sur le premier bouton "Télécharger" (export le plus récent)
+  const downloadBtn = page.locator(".badge:has-text('Télécharger')").first();
+  await downloadBtn.waitFor({ state: "visible", timeout: 10_000 });
+
+  // Playwright intercepte le téléchargement directement — pas besoin de ~/Downloads
+  console.log(`${tag} — téléchargement en cours...`);
+  const [download] = await Promise.all([
+    context.waitForEvent("download", { timeout: 60_000 }),
+    downloadBtn.click(),
+  ]);
+
+  // Sauvegarde dans le répertoire de travail du script
   const csvPath = join(downloadDir, download.suggestedFilename() || `${label}.csv`);
   await download.saveAs(csvPath);
-  console.log(`[Fleetee ${account.key}] ${label} — fichier : ${csvPath}`);
+  console.log(`${tag} — fichier sauvegardé : ${csvPath}`);
+
   return csvPath;
 }
 
@@ -244,15 +284,70 @@ async function syncAccount(account) {
     // ── Connexion ──────────────────────────────────────────────────────────
     console.log(`[Fleetee ${account.key}] Connexion...`);
     await page.goto("https://app.fleetee.io/login");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
-    await page.fill('input[type="email"], input[name="email"]', account.email);
-    await page.fill('input[type="password"], input[name="password"]', account.password);
-    await page.click('button[type="submit"]');
+    // Champ email — plusieurs sélecteurs possibles selon la version de l'UI
+    const emailSelectors = [
+      'input[type="email"]',
+      'input[name="email"]',
+      'input[autocomplete="email"]',
+      'input[placeholder*="mail" i]',
+    ];
+    let emailField = null;
+    for (const sel of emailSelectors) {
+      const el = page.locator(sel).first();
+      if (await el.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        emailField = el;
+        break;
+      }
+    }
+    if (!emailField) {
+      const ss = join(downloadDir, "debug-login.png");
+      await page.screenshot({ path: ss, fullPage: true });
+      throw new Error(`Champ email introuvable sur la page de login. Screenshot : ${ss}`);
+    }
+    await emailField.fill(account.email);
+
+    const passwordSelectors = [
+      'input[type="password"]',
+      'input[name="password"]',
+      'input[autocomplete="current-password"]',
+    ];
+    for (const sel of passwordSelectors) {
+      const el = page.locator(sel).first();
+      if (await el.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await el.fill(account.password);
+        break;
+      }
+    }
+
+    // Soumettre : bouton submit ou touche Entrée en fallback
+    const submitSelectors = [
+      'button[type="submit"]',
+      'button:has-text("Connexion")',
+      'button:has-text("Se connecter")',
+      'button:has-text("Login")',
+      'button:has-text("Sign in")',
+      'input[type="submit"]',
+    ];
+    let submitted = false;
+    for (const sel of submitSelectors) {
+      const el = page.locator(sel).first();
+      if (await el.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await el.click();
+        submitted = true;
+        break;
+      }
+    }
+    if (!submitted) {
+      // Fallback : Entrée depuis le champ mot de passe
+      await page.keyboard.press("Enter");
+    }
+
     await page.waitForLoadState("networkidle");
     console.log(`[Fleetee ${account.key}] Connecté.`);
 
-    // ── Export véhicules ───────────────────────────────────────────────────
+    // ── Déclenchement export véhicules ────────────────────────────────────
     const vehicleTypeParam = account.vehicleTypeId
       ? `&vehicle_type_id=${account.vehicleTypeId}`
       : "";
@@ -261,17 +356,21 @@ async function syncAccount(account) {
     console.log(`[Fleetee ${account.key}] Véhicules — navigation vers ${vehiclesUrl}`);
     await page.goto(vehiclesUrl);
     await page.waitForLoadState("networkidle");
+    await triggerExport(page, account, "vehicules", downloadDir);
 
-    vehiclesCsvPath = await downloadExport(page, account, "vehicules", downloadDir);
+    // ── Attente + téléchargement véhicules depuis /exports/list ───────────
+    vehiclesCsvPath = await downloadLatestExport(page, context, account, "vehicules", downloadDir);
 
-    // ── Export réservations ────────────────────────────────────────────────
+    // ── Déclenchement export réservations ─────────────────────────────────
     const bookingsUrl = `https://app.fleetee.io/${account.accountSlug}/bookings?page=0&limit=500`;
 
     console.log(`[Fleetee ${account.key}] Réservations — navigation vers ${bookingsUrl}`);
     await page.goto(bookingsUrl);
     await page.waitForLoadState("networkidle");
+    await triggerExport(page, account, "reservations", downloadDir);
 
-    bookingsCsvPath = await downloadExport(page, account, "reservations", downloadDir);
+    // ── Attente + téléchargement réservations depuis /exports/list ────────
+    bookingsCsvPath = await downloadLatestExport(page, context, account, "reservations", downloadDir);
   } finally {
     await browser.close();
   }
@@ -280,6 +379,10 @@ async function syncAccount(account) {
   const vehiclesCsv = await readFile(vehiclesCsvPath, "utf-8");
   const vehicleRows = parseCsv(vehiclesCsv);
   console.log(`[Fleetee ${account.key}] Véhicules — ${vehicleRows.length} ligne(s) dans le CSV.`);
+  if (vehicleRows.length > 0) {
+    console.log(`[Fleetee ${account.key}] Véhicules — colonnes : ${Object.keys(vehicleRows[0]).join(" | ")}`);
+    console.log(`[Fleetee ${account.key}] Véhicules — 1ère ligne : ${JSON.stringify(vehicleRows[0])}`);
+  }
 
   const vehicleResult = await ingestVehicles(vehicleRows, account);
 
@@ -291,6 +394,10 @@ async function syncAccount(account) {
   console.log(
     `[Fleetee ${account.key}] Réservations — ${allBookingRows.length} ligne(s) dans le CSV.`,
   );
+  if (allBookingRows.length > 0) {
+    console.log(`[Fleetee ${account.key}] Réservations — colonnes : ${Object.keys(allBookingRows[0]).join(" | ")}`);
+    console.log(`[Fleetee ${account.key}] Réservations — 1ère ligne : ${JSON.stringify(allBookingRows[0])}`);
+  }
 
   const now = new Date();
   const upcoming = allBookingRows.filter((row) => {
