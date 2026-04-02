@@ -3,14 +3,16 @@ export type BookingItem = {
   date: string; // ISO "YYYY-MM-DD"
   type: "PICKUP" | "RETURN"; // remise de clé ou retour
   client: string;
-  pickup: string;      // "Lieu / HHhMM"
-  dropoff: string;     // "Lieu / HHhMM"
+  pickup: string; // "Lieu / HHhMM"
+  dropoff: string; // "Lieu / HHhMM"
   dropoffDate: string; // ISO "YYYY-MM-DD"
   car: string;
   plateNumber: string;
   amount: number;
-  source: "Fleetee A" | "Fleetee B" | "Getaround" | "Turo";
+  source: "Fleetee A" | "Fleetee B" | "Getaround" | "Turo" | "Direct";
   agency: AgencyBrand;
+  startAtIso?: string;
+  endAtIso?: string;
 };
 
 export type VehicleOperationalStatus =

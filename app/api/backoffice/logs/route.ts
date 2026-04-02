@@ -70,12 +70,18 @@ function serializeLog(
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await getAuthUserFromCookie();
   if (!user) return unauthorizedResponse();
 
   try {
-    const logs = await listStatusLogs(15);
+    const { searchParams } = new URL(request.url);
+    const rawLimit = Number(searchParams.get("limit"));
+    const limit =
+      Number.isFinite(rawLimit) && rawLimit > 0
+        ? Math.min(Math.floor(rawLimit), 1000)
+        : 15;
+    const logs = await listStatusLogs(limit);
     return Response.json({ ok: true, logs: logs.map(serializeLog) });
   } catch (error) {
     console.error("GET /api/backoffice/logs failed", error);
