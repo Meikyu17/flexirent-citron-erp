@@ -1,6 +1,7 @@
 import { getAuthUserFromCookie, unauthorizedResponse } from "@/lib/auth";
 import {
   createStatusLog,
+  findOverlappingReservationConflict,
   listStatusLogs,
   resolveReservationDisplayStatusFromDates,
 } from "@/lib/backoffice";
@@ -9,7 +10,7 @@ import { z } from "zod";
 
 const statusLabels = {
   AVAILABLE: "Disponible",
-  RESERVED: "Réservé",
+  RESERVED: "Reserve",
   IN_RENT: "En location",
   OUT_OF_SERVICE: "Hors service",
 } as const;
@@ -19,6 +20,24 @@ const brandLabels = {
   FLEXIRENT: "Flexirent",
 } as const;
 
+const platformLabels = {
+  GETAROUND: "Getaround",
+  FLEETEE: "Fleetee",
+  TURO: "Turo",
+  DIRECT: "Direct",
+} as const;
+
+function formatDateTime(date: Date | null) {
+  if (!date) return "ouverte";
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function serializeLog(
   log: Awaited<ReturnType<typeof listStatusLogs>>[number],
 ) {
@@ -27,11 +46,18 @@ function serializeLog(
       ? resolveReservationDisplayStatusFromDates(log.startsAt, log.endsAt)
       : log.status;
 
+  const isReservation =
+    log.status === VehicleOperationalStatus.RESERVED ||
+    Boolean(log.startsAt) ||
+    Boolean(log.endsAt);
+
   return {
     id: log.id,
+    vehicleId: log.vehicleId,
     vehicle: log.vehicle,
     status,
     statusLabel: statusLabels[status],
+    isReservation,
     customerName: log.customerName,
     customerPhone: log.customerPhone,
     startsAt: log.startsAt?.toISOString() ?? null,
@@ -93,15 +119,54 @@ export async function POST(request: Request) {
   const d = parsed.data;
   const startsAt = d.startsAt ? new Date(d.startsAt) : null;
   const endsAt = d.endsAt ? new Date(d.endsAt) : null;
-  const hasReservationWindow = Boolean(startsAt || endsAt);
 
-  // Reservation statuses are fully automatic from dates.
+  if (!startsAt && endsAt) {
+    return Response.json(
+      { ok: false, error: "La date de debut est requise pour une reservation." },
+      { status: 400 },
+    );
+  }
+  if (startsAt && endsAt && endsAt < startsAt) {
+    return Response.json(
+      { ok: false, error: "La date de fin doit etre apres la date de debut." },
+      { status: 400 },
+    );
+  }
+
+  const hasReservationWindow = Boolean(startsAt);
   const normalizedStatus =
     d.status === VehicleOperationalStatus.OUT_OF_SERVICE
       ? VehicleOperationalStatus.OUT_OF_SERVICE
       : hasReservationWindow
         ? VehicleOperationalStatus.RESERVED
         : VehicleOperationalStatus.AVAILABLE;
+
+  if (normalizedStatus === VehicleOperationalStatus.RESERVED && startsAt) {
+    const conflict = await findOverlappingReservationConflict({
+      vehicleId: d.vehicleId,
+      startsAt,
+      endsAt,
+      platform: d.platform ?? null,
+    });
+
+    if (conflict) {
+      const platformLabel = platformLabels[conflict.platform];
+      const startLabel = formatDateTime(conflict.startsAt);
+      const endLabel = formatDateTime(conflict.endsAt);
+      const customer = conflict.customerName
+        ? ` (client: ${conflict.customerName})`
+        : "";
+      return Response.json(
+        {
+          ok: false,
+          error:
+            `Chevauchement detecte avec la reservation ${platformLabel} ` +
+            `[${conflict.reference}] du ${startLabel} au ${endLabel}${customer}.`,
+        },
+        { status: 409 },
+      );
+    }
+  }
 
   try {
     const log = await createStatusLog({

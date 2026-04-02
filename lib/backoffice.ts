@@ -1,4 +1,9 @@
-import { AgencyBrand, RentalPlatform, VehicleOperationalStatus } from "@prisma/client";
+import {
+  AgencyBrand,
+  RentalPlatform,
+  ReservationSource,
+  VehicleOperationalStatus,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { statusLabelFromOperationalStatus } from "@/lib/vehicles";
 
@@ -7,6 +12,15 @@ export type BackofficeDisplayStatus =
   | "RESERVED"
   | "IN_RENT"
   | "OUT_OF_SERVICE";
+
+export type ReservationOverlapConflict = {
+  origin: "STATUS_LOG" | "SYNC_RESERVATION";
+  platform: RentalPlatform;
+  startsAt: Date;
+  endsAt: Date | null;
+  customerName: string | null;
+  reference: string;
+};
 
 function isDateRangeActive(
   startsAt: Date | null | undefined,
@@ -25,6 +39,129 @@ export function resolveReservationDisplayStatusFromDates(
   now = new Date(),
 ): BackofficeDisplayStatus {
   return isDateRangeActive(startsAt, endsAt, now) ? "IN_RENT" : "RESERVED";
+}
+
+function toPlatform(source: ReservationSource): RentalPlatform {
+  switch (source) {
+    case ReservationSource.FLEETEE_A:
+    case ReservationSource.FLEETEE_B:
+      return RentalPlatform.FLEETEE;
+    case ReservationSource.GETAROUND:
+      return RentalPlatform.GETAROUND;
+    case ReservationSource.TURO:
+      return RentalPlatform.TURO;
+    default:
+      return RentalPlatform.DIRECT;
+  }
+}
+
+function normalizePlatform(platform: RentalPlatform | null): RentalPlatform {
+  return platform ?? RentalPlatform.DIRECT;
+}
+
+function overlaps(
+  aStart: Date,
+  aEnd: Date | null,
+  bStart: Date,
+  bEnd: Date | null,
+) {
+  const aEndTs = aEnd?.getTime() ?? Number.POSITIVE_INFINITY;
+  const bEndTs = bEnd?.getTime() ?? Number.POSITIVE_INFINITY;
+  return aStart.getTime() <= bEndTs && bStart.getTime() <= aEndTs;
+}
+
+export async function findOverlappingReservationConflict(data: {
+  vehicleId: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  platform: RentalPlatform | null;
+  excludeStatusLogId?: string;
+}) {
+  const incomingPlatform = normalizePlatform(data.platform);
+
+  const [statusLogs, reservations] = await prisma.$transaction([
+    prisma.vehicleStatusLog.findMany({
+      where: {
+        vehicleId: data.vehicleId,
+        status: VehicleOperationalStatus.RESERVED,
+        startsAt: { not: null },
+        ...(data.excludeStatusLogId
+          ? { id: { not: data.excludeStatusLogId } }
+          : {}),
+        OR: [
+          { endsAt: null },
+          { endsAt: { gte: data.startsAt } },
+        ],
+      },
+      select: {
+        id: true,
+        platform: true,
+        customerName: true,
+        startsAt: true,
+        endsAt: true,
+      },
+      orderBy: { startsAt: "asc" },
+      take: 100,
+    }),
+    prisma.reservation.findMany({
+      where: {
+        vehicleId: data.vehicleId,
+        endsAt: { gte: data.startsAt },
+      },
+      select: {
+        id: true,
+        externalId: true,
+        source: true,
+        customerName: true,
+        startsAt: true,
+        endsAt: true,
+      },
+      orderBy: { startsAt: "asc" },
+      take: 100,
+    }),
+  ]);
+
+  const logConflict = statusLogs.find((log) => {
+    if (!log.startsAt) return false;
+    const existingPlatform = normalizePlatform(log.platform);
+    if (existingPlatform === incomingPlatform) return false;
+    return overlaps(log.startsAt, log.endsAt, data.startsAt, data.endsAt);
+  });
+
+  if (logConflict?.startsAt) {
+    return {
+      origin: "STATUS_LOG",
+      platform: normalizePlatform(logConflict.platform),
+      startsAt: logConflict.startsAt,
+      endsAt: logConflict.endsAt,
+      customerName: logConflict.customerName,
+      reference: logConflict.id,
+    } satisfies ReservationOverlapConflict;
+  }
+
+  const reservationConflict = reservations.find((reservation) => {
+    const existingPlatform = toPlatform(reservation.source);
+    if (existingPlatform === incomingPlatform) return false;
+    return overlaps(
+      reservation.startsAt,
+      reservation.endsAt,
+      data.startsAt,
+      data.endsAt,
+    );
+  });
+
+  if (reservationConflict) {
+    return {
+      origin: "SYNC_RESERVATION",
+      platform: toPlatform(reservationConflict.source),
+      startsAt: reservationConflict.startsAt,
+      endsAt: reservationConflict.endsAt,
+      customerName: reservationConflict.customerName,
+      reference: reservationConflict.externalId || reservationConflict.id,
+    } satisfies ReservationOverlapConflict;
+  }
+
+  return null;
 }
 
 export async function listAgencies() {
@@ -230,6 +367,27 @@ export async function createStatusLog(data: {
     }
 
     return log;
+  });
+}
+
+export async function updateStatusLogReservation(
+  logId: string,
+  data: {
+    vehicleId: string;
+    startsAt: Date;
+    endsAt: Date | null;
+  },
+) {
+  return prisma.vehicleStatusLog.update({
+    where: { id: logId },
+    data: {
+      vehicleId: data.vehicleId,
+      startsAt: data.startsAt,
+      endsAt: data.endsAt,
+    },
+    include: {
+      vehicle: { select: { model: true, plateNumber: true } },
+    },
   });
 }
 

@@ -29,9 +29,11 @@ type BackofficeAgency = {
 
 type StatusLog = {
   id: string;
+  vehicleId: string;
   vehicle: { model: string; plateNumber: string };
   status: OperationalStatus;
   statusLabel: string;
+  isReservation: boolean;
   customerName: string | null;
   customerPhone: string | null;
   startsAt: string | null;
@@ -69,6 +71,12 @@ type AddVehicleForm = {
   parkingArea: string;
   parkingSpot: string;
   agencyId: string;
+};
+
+type EditReservationForm = {
+  vehicleId: string;
+  startsAt: string;
+  endsAt: string;
 };
 
 const STATUS_OPTIONS: { value: OperationalStatus; label: string }[] = [
@@ -121,6 +129,18 @@ function formatDateTime(iso: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function toDateTimeLocalValue(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 }
 
 function isDraftDirty(vehicle: BackofficeVehicle, draft: VehicleDraft): boolean {
@@ -179,6 +199,14 @@ export default function BackofficePage() {
   const [logSuccess, setLogSuccess] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
   const [logDeleteError, setLogDeleteError] = useState<string | null>(null);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editReservationForm, setEditReservationForm] = useState<EditReservationForm>({
+    vehicleId: "",
+    startsAt: "",
+    endsAt: "",
+  });
+  const [editLoadingId, setEditLoadingId] = useState<string | null>(null);
+  const [editLogError, setEditLogError] = useState<string | null>(null);
 
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
@@ -397,6 +425,10 @@ export default function BackofficePage() {
       setLogError("Selectionnez un vehicule.");
       return;
     }
+    if (!logForm.startsAt && logForm.endsAt) {
+      setLogError("La date de début est requise pour une réservation.");
+      return;
+    }
 
     const selectedVehicle = vehicles.find((v) => v.id === logForm.vehicleId);
     const computedFromDates = computeReservationStatusFromInputs(logForm.startsAt, logForm.endsAt);
@@ -425,29 +457,8 @@ export default function BackofficePage() {
       const data = (await res.json()) as { ok: boolean; log?: StatusLog; error?: string };
       if (!res.ok || !data.ok || !data.log) throw new Error(data.error ?? "Erreur enregistrement");
 
-      // Keep local status in sync only for manual out-of-service toggles.
-      if (effectiveStatus === "OUT_OF_SERVICE" || effectiveStatus === "AVAILABLE") {
-        setVehicles((prev) =>
-          prev.map((v) =>
-            v.id === logForm.vehicleId ? { ...v, operationalStatus: effectiveStatus } : v,
-          ),
-        );
-        setDrafts((prev) => ({
-          ...prev,
-          [logForm.vehicleId]: {
-            ...(prev[logForm.vehicleId] ?? {
-              model: "",
-              parkingArea: "",
-              parkingSpot: "",
-              isOutOfService: false,
-              isCleaned: false,
-            }),
-            isOutOfService: effectiveStatus === "OUT_OF_SERVICE",
-          },
-        }));
-      }
-
       setLogs((prev) => [data.log!, ...prev.slice(0, 14)]);
+      await syncVehiclesFromApi();
       setLogForm((prev) => ({
         ...prev,
         customerName: "",
@@ -483,6 +494,64 @@ export default function BackofficePage() {
       setLogDeleteError(err instanceof Error ? err.message : "Erreur de suppression");
     } finally {
       setDeletingLogId(null);
+    }
+  };
+
+  const startEditingReservation = (log: StatusLog) => {
+    setEditingLogId(log.id);
+    setEditLogError(null);
+    setEditReservationForm({
+      vehicleId: log.vehicleId,
+      startsAt: toDateTimeLocalValue(log.startsAt),
+      endsAt: toDateTimeLocalValue(log.endsAt),
+    });
+  };
+
+  const cancelEditingReservation = () => {
+    setEditingLogId(null);
+    setEditLoadingId(null);
+    setEditLogError(null);
+  };
+
+  const handleSaveReservationEdit = async (logId: string) => {
+    if (!editReservationForm.vehicleId) {
+      setEditLogError("Selectionnez un vehicule.");
+      return;
+    }
+    if (!editReservationForm.startsAt) {
+      setEditLogError("La date de debut est requise.");
+      return;
+    }
+
+    setEditLoadingId(logId);
+    setEditLogError(null);
+    try {
+      const startsAtIso = new Date(editReservationForm.startsAt).toISOString();
+      const endsAtIso = editReservationForm.endsAt
+        ? new Date(editReservationForm.endsAt).toISOString()
+        : null;
+
+      const res = await fetch(`/api/backoffice/logs/${logId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vehicleId: editReservationForm.vehicleId,
+          startsAt: startsAtIso,
+          endsAt: endsAtIso,
+        }),
+      });
+      const data = (await res.json()) as { ok: boolean; log?: StatusLog; error?: string };
+      if (!res.ok || !data.ok || !data.log) {
+        throw new Error(data.error ?? "Erreur de modification");
+      }
+
+      setLogs((prev) => prev.map((log) => (log.id === logId ? data.log! : log)));
+      await syncVehiclesFromApi();
+      cancelEditingReservation();
+    } catch (err) {
+      setEditLogError(err instanceof Error ? err.message : "Erreur de modification");
+    } finally {
+      setEditLoadingId(null);
     }
   };
 
@@ -1096,15 +1165,111 @@ export default function BackofficePage() {
                       {log.notes && (
                         <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{log.notes}</p>
                       )}
-                      {(log.status === "RESERVED" || log.status === "IN_RENT") && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteReservationLog(log.id)}
-                          disabled={deletingLogId === log.id}
-                          className="nav-button-danger cursor-pointer mt-2"
-                        >
-                          {deletingLogId === log.id ? "Suppression…" : "Supprimer réservation"}
-                        </button>
+                      {log.isReservation && (
+                        <>
+                          {editingLogId === log.id ? (
+                            <div className="mt-2 flex flex-col gap-2">
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs" style={{ color: "var(--muted)" }}>
+                                  Véhicule
+                                </label>
+                                <select
+                                  value={editReservationForm.vehicleId}
+                                  onChange={(e) =>
+                                    setEditReservationForm((prev) => ({
+                                      ...prev,
+                                      vehicleId: e.target.value,
+                                    }))
+                                  }
+                                  style={inputStyle}
+                                >
+                                  {vehicles.map((vehicle) => (
+                                    <option key={vehicle.id} value={vehicle.id}>
+                                      {vehicle.model} · {vehicle.plateNumber}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="flex gap-2">
+                                <div className="flex flex-col gap-1 flex-1">
+                                  <label className="text-xs" style={{ color: "var(--muted)" }}>
+                                    Début
+                                  </label>
+                                  <input
+                                    type="datetime-local"
+                                    value={editReservationForm.startsAt}
+                                    onChange={(e) =>
+                                      setEditReservationForm((prev) => ({
+                                        ...prev,
+                                        startsAt: e.target.value,
+                                      }))
+                                    }
+                                    style={inputStyle}
+                                  />
+                                </div>
+                                <div className="flex flex-col gap-1 flex-1">
+                                  <label className="text-xs" style={{ color: "var(--muted)" }}>
+                                    Fin
+                                  </label>
+                                  <input
+                                    type="datetime-local"
+                                    value={editReservationForm.endsAt}
+                                    onChange={(e) =>
+                                      setEditReservationForm((prev) => ({
+                                        ...prev,
+                                        endsAt: e.target.value,
+                                      }))
+                                    }
+                                    style={inputStyle}
+                                  />
+                                </div>
+                              </div>
+
+                              {editLogError && (
+                                <p className="text-xs" style={{ color: "var(--danger)" }}>
+                                  {editLogError}
+                                </p>
+                              )}
+
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  className="vehicle-toggle cursor-pointer flex-1"
+                                  onClick={() => cancelEditingReservation()}
+                                >
+                                  Annuler
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveReservationEdit(log.id)}
+                                  disabled={editLoadingId === log.id}
+                                  style={{ ...primaryButtonStyle, flex: 1 }}
+                                >
+                                  {editLoadingId === log.id ? "Enregistrement…" : "Enregistrer"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-2 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startEditingReservation(log)}
+                                className="vehicle-toggle cursor-pointer flex-1"
+                              >
+                                Modifier réservation
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteReservationLog(log.id)}
+                                disabled={deletingLogId === log.id}
+                                className="nav-button-danger cursor-pointer flex-1"
+                              >
+                                {deletingLogId === log.id ? "Suppression…" : "Supprimer réservation"}
+                              </button>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   ))}
