@@ -31,6 +31,7 @@ import {
   type SplitLayout,
 } from "./dashboard/layout/split-layout";
 import { Splitter } from "./dashboard/layout/Splitter";
+import Link from "next/link";
 import { OverviewPanel } from "./dashboard/panels/overview/OverviewPanel";
 import { VehiclePanel } from "./dashboard/panels/vehicles/VehiclePanel";
 import { DispatchPanel } from "./dashboard/panels/dispatch/DispatchPanel";
@@ -551,6 +552,9 @@ export default function Home() {
             <button type="button" className="vehicle-toggle cursor-pointer">
               Paramètres
             </button>
+            <Link href="/backoffice" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
+              Backoffice
+            </Link>
 
             <span className="nav-divider" aria-hidden="true" />
 
