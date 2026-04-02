@@ -31,6 +31,7 @@ const sourceLabel: Record<BookingItem["source"], string> = {
   "Fleetee B": "Fleetee",
   Getaround: "Getaround",
   Turo: "Turo",
+  Direct: "Direct",
 };
 
 const agencyLabel: Record<BookingItem["agency"], string> = {

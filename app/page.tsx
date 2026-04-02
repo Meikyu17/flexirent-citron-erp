@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -13,12 +14,8 @@ import type {
   BookingItem,
   DispatchItem,
   EmployeeStat,
-  FleetVehicle,
   OpenclawPingStatus,
-  ParkingOptions,
-  VehicleDraft,
 } from "./dashboard/shared/types";
-import { makeVehicleDrafts } from "./dashboard/shared/utils";
 import {
   clamp,
   defaultLayout,
@@ -31,156 +28,88 @@ import {
   type SplitLayout,
 } from "./dashboard/layout/split-layout";
 import { Splitter } from "./dashboard/layout/Splitter";
+import Link from "next/link";
 import { OverviewPanel } from "./dashboard/panels/overview/OverviewPanel";
-import { VehiclePanel } from "./dashboard/panels/vehicles/VehiclePanel";
 import { DispatchPanel } from "./dashboard/panels/dispatch/DispatchPanel";
 import { ReservationsPanel } from "./dashboard/panels/reservations/ReservationsPanel";
 import { PerformancePanel } from "./dashboard/panels/performance/PerformancePanel";
 
-const bookings: BookingItem[] = [
-  // — Vendredi 21 mars —
-  {
-    id: "R-2191",
-    date: "2026-03-21",
-    type: "PICKUP",
-    client: "Dominique D.",
-    pickup: "Jean-Jaurès / 15h30",
-    dropoff: "Jean-Jaurès / 20h30",
-    dropoffDate: "2026-03-21",
-    car: "Citroen C3 Grise",
-    plateNumber: "AB-421-CD",
-    amount: 132,
-    source: "Fleetee A",
-    agency: "CITRON_LOCATION",
-  },
-  {
-    id: "R-2193",
-    date: "2026-03-21",
-    type: "RETURN",
-    client: "Sabrina M.",
-    pickup: "Citron Centre / 09h15",
-    dropoff: "Citron Centre / 17h00",
-    dropoffDate: "2026-03-21",
-    car: "Peugeot 206 Bleue",
-    plateNumber: "EF-087-GH",
-    amount: 94,
-    source: "Getaround",
-    agency: "CITRON_LOCATION",
-  },
-  {
-    id: "R-2198",
-    date: "2026-03-21",
-    type: "PICKUP",
-    client: "Jean D.",
-    pickup: "Jean-Jaurès / 13h45",
-    dropoff: "Jean-Jaurès / 18h45",
-    dropoffDate: "2026-03-23",
-    car: "Citroen C3 Grise",
-    plateNumber: "IJ-654-KL",
-    amount: 121,
-    source: "Fleetee B",
-    agency: "FLEXIRENT",
-  },
-  // — Samedi 22 mars —
-  {
-    id: "R-2201",
-    date: "2026-03-22",
-    type: "RETURN",
-    client: "Marie L.",
-    pickup: "Citron Centre / 08h30",
-    dropoff: "Citron Centre / 12h00",
-    dropoffDate: "2026-03-22",
-    car: "Renault Clio Blanche",
-    plateNumber: "MN-302-OP",
-    amount: 58,
-    source: "Fleetee A",
-    agency: "CITRON_LOCATION",
-  },
-  {
-    id: "R-2202",
-    date: "2026-03-22",
-    type: "PICKUP",
-    client: "Pierre K.",
-    pickup: "Jean-Jaurès / 14h00",
-    dropoff: "Jean-Jaurès / 19h30",
-    dropoffDate: "2026-03-25",
-    car: "Peugeot 208 Noire",
-    plateNumber: "QR-118-ST",
-    amount: 87,
-    source: "Getaround",
-    agency: "FLEXIRENT",
-  },
-  // — Lundi 24 mars —
-  {
-    id: "R-2205",
-    date: "2026-03-24",
-    type: "PICKUP",
-    client: "Thomas B.",
-    pickup: "Citron Centre / 10h00",
-    dropoff: "Citron Centre / 18h00",
-    dropoffDate: "2026-03-24",
-    car: "Citroen C3 Grise",
-    plateNumber: "UV-773-WX",
-    amount: 110,
-    source: "Fleetee B",
-    agency: "FLEXIRENT",
-  },
-  {
-    id: "R-2206",
-    date: "2026-03-24",
-    type: "RETURN",
-    client: "Claire M.",
-    pickup: "Jean-Jaurès / 16h30",
-    dropoff: "Jean-Jaurès / 20h00",
-    dropoffDate: "2026-03-24",
-    car: "Renault Clio Blanche",
-    plateNumber: "YZ-540-AA",
-    amount: 64,
-    source: "Turo",
-    agency: "FLEXIRENT",
-  },
-  // — Mercredi 26 mars —
-  {
-    id: "R-2210",
-    date: "2026-03-26",
-    type: "RETURN",
-    client: "Antoine R.",
-    pickup: "Citron Centre / 09h00",
-    dropoff: "Citron Centre / 17h30",
-    dropoffDate: "2026-03-28",
-    car: "Peugeot 206 Bleue",
-    plateNumber: "BB-215-CC",
-    amount: 145,
-    source: "Fleetee A",
-    agency: "CITRON_LOCATION",
-  },
-];
+const bookings: BookingItem[] = [];
 
-const initialDispatches: DispatchItem[] = [
-  {
-    id: "D-10",
-    bookingRef: "R-2198",
-    mission: "Jeudi 14 Janvier / Jean-Jaurès / 13h45",
-    members: [],
-    state: "À assigner",
-  },
-  {
-    id: "D-11",
-    bookingRef: "R-2191",
-    mission: "Jeudi 14 Janvier / Jean-Jaurès / 15h30",
-    members: ["Nathan"],
-    state: "Assigné",
-  },
-];
+const initialDispatches: DispatchItem[] = [];
 
-const employeeStats: EmployeeStat[] = [
-  { name: "Nathan", handovers: 28, returns: 24 },
-  { name: "Louise", handovers: 19, returns: 21 },
-  { name: "Adrian", handovers: 16, returns: 17 },
-  { name: "Aimery", handovers: 14, returns: 15 },
-];
+const employeeStats: EmployeeStat[] = [];
 
-const dispatchOperators = employeeStats.map((employee) => employee.name);
+type BackofficeReservationLog = {
+  id: string;
+  vehicle: { model: string; plateNumber: string };
+  isReservation: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  customerName: string | null;
+  agencyBrand: AgencyBrand;
+  platform: "GETAROUND" | "FLEETEE" | "TURO" | "DIRECT" | null;
+};
+
+type OverviewFleetVehicle = {
+  operationalStatus: "AVAILABLE" | "RESERVED" | "IN_RENT" | "OUT_OF_SERVICE";
+  agency: { brand: AgencyBrand };
+};
+
+function toLocalIsoDate(date: Date): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function toHourLabel(date: Date): string {
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${hh}h${mm}`;
+}
+
+function sourceFromPlatform(
+  platform: BackofficeReservationLog["platform"],
+): BookingItem["source"] {
+  if (platform === "GETAROUND") return "Getaround";
+  if (platform === "TURO") return "Turo";
+  if (platform === "DIRECT") return "Direct";
+  return "Fleetee A";
+}
+
+function mapBackofficeLogToBooking(log: BackofficeReservationLog): BookingItem | null {
+  if (!log.isReservation || !log.startsAt) return null;
+
+  const start = new Date(log.startsAt);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const end = log.endsAt ? new Date(log.endsAt) : null;
+  if (end && Number.isNaN(end.getTime())) return null;
+
+  const isOngoing = start <= new Date() && (!end || end >= new Date());
+  const type: BookingItem["type"] = isOngoing ? "RETURN" : "PICKUP";
+  const pickupTime = toHourLabel(start);
+  const dropoffRef = end ?? start;
+  const dropoffTime = toHourLabel(dropoffRef);
+
+  return {
+    id: `BO-${log.id}`,
+    date: toLocalIsoDate(start),
+    type,
+    client: log.customerName?.trim() || "Client backoffice",
+    pickup: `Backoffice / ${pickupTime}`,
+    dropoff: `Backoffice / ${dropoffTime}`,
+    dropoffDate: toLocalIsoDate(dropoffRef),
+    car: log.vehicle.model,
+    plateNumber: log.vehicle.plateNumber,
+    amount: 0,
+    source: sourceFromPlatform(log.platform),
+    agency: log.agencyBrand,
+    startAtIso: start.toISOString(),
+    endAtIso: end?.toISOString(),
+  };
+}
 
 function formatScrapeElapsed(lastScrapeAt: string | null, now: number): string {
   if (!lastScrapeAt) return "jamais";
@@ -209,7 +138,6 @@ export default function Home() {
   const router = useRouter();
   const desktopRootRef = useRef<HTMLDivElement>(null);
   const desktopLeftRef = useRef<HTMLDivElement>(null);
-  const desktopBottomRef = useRef<HTMLDivElement>(null);
   const desktopRightRef = useRef<HTMLDivElement>(null);
   const tabletRootRef = useRef<HTMLDivElement>(null);
   const tabletLeftRef = useRef<HTMLDivElement>(null);
@@ -220,19 +148,15 @@ export default function Home() {
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [loggingOut, setLoggingOut] = useState(false);
-  const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
-  const [vehicleDrafts, setVehicleDrafts] = useState<Record<string, VehicleDraft>>({});
-  const [selectedBrand, setSelectedBrand] = useState<"ALL" | AgencyBrand>("ALL");
-  const [fleetLoading, setFleetLoading] = useState(true);
-  const [fleetError, setFleetError] = useState<string | null>(null);
-  const [savingVehicleId, setSavingVehicleId] = useState<string | null>(null);
+  const [overviewFleetVehicles, setOverviewFleetVehicles] = useState<OverviewFleetVehicle[]>([]);
+  const [overviewFleetLoading, setOverviewFleetLoading] = useState(true);
   const [openclawStatus, setOpenclawStatus] = useState<OpenclawPingStatus>("checking");
   const [lastOpenclawScrapeAt, setLastOpenclawScrapeAt] = useState<string | null>(
     null,
   );
   const [relativeNow, setRelativeNow] = useState(Date.now());
-  const [parkingOptions, setParkingOptions] = useState<ParkingOptions>({ areas: [], spots: [] });
   const [dispatchItems, setDispatchItems] = useState<DispatchItem[]>(initialDispatches);
+  const [backofficeBookings, setBackofficeBookings] = useState<BookingItem[]>([]);
   const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
   const [dispatchFilter, setDispatchFilter] = useState<"À assigner" | "Assigné" | null>(null);
 
@@ -247,6 +171,8 @@ export default function Home() {
   const visibleVehicles = fleetVehicles.filter(
     (vehicle) => selectedBrand === "ALL" || vehicle.agency.brand === selectedBrand,
   );
+
+  const operators = employeeStats.map((e) => e.name);
 
   // — Layout persistence —
   useEffect(() => {
@@ -283,44 +209,62 @@ export default function Home() {
     localStorage.setItem("citron-theme", theme);
   }, [theme]);
 
-  // — Fleet loading —
   useEffect(() => {
     let cancelled = false;
-    const loadVehicles = async () => {
-      setFleetLoading(true);
-      setFleetError(null);
+
+    const loadOverviewFleet = async (setLoading: boolean) => {
+      if (setLoading) setOverviewFleetLoading(true);
       try {
-        const response = await fetch("/api/vehicles", { cache: "no-store" });
-        const payload = (await response.json()) as { ok: boolean; error?: string; vehicles?: FleetVehicle[] };
+        const response = await fetch("/api/backoffice/vehicles", { cache: "no-store" });
+        const payload = (await response.json()) as {
+          ok: boolean;
+          vehicles?: OverviewFleetVehicle[];
+        };
         if (!response.ok || !payload.ok || !payload.vehicles) {
-          throw new Error(payload.error ?? "Chargement des véhicules impossible");
+          throw new Error("Chargement des statuts de flotte impossible");
         }
         if (cancelled) return;
-        setFleetVehicles(payload.vehicles);
-        setVehicleDrafts(makeVehicleDrafts(payload.vehicles));
-      } catch (error) {
-        if (cancelled) return;
-        setFleetError(error instanceof Error ? error.message : "Chargement des véhicules impossible");
+        setOverviewFleetVehicles(payload.vehicles);
+      } catch {
+        if (!cancelled) setOverviewFleetVehicles([]);
       } finally {
-        if (!cancelled) setFleetLoading(false);
+        if (!cancelled && setLoading) setOverviewFleetLoading(false);
       }
     };
-    void loadVehicles();
-    return () => { cancelled = true; };
+
+    void loadOverviewFleet(true);
+    const intervalId = window.setInterval(() => void loadOverviewFleet(false), 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
-  // — Parking options —
   useEffect(() => {
-    const load = async () => {
+    let cancelled = false;
+    const loadBackofficeReservations = async () => {
       try {
-        const response = await fetch("/api/vehicles/parking-options", { cache: "no-store" });
-        const payload = (await response.json()) as { ok: boolean; areas?: string[]; spots?: string[] };
-        if (response.ok && payload.ok) {
-          setParkingOptions({ areas: payload.areas ?? [], spots: payload.spots ?? [] });
-        }
-      } catch { /* non-critical */ }
+        const response = await fetch("/api/backoffice/logs?limit=300", { cache: "no-store" });
+        const payload = (await response.json()) as {
+          ok: boolean;
+          logs?: BackofficeReservationLog[];
+        };
+
+        if (!response.ok || !payload.ok || !payload.logs) return;
+        if (cancelled) return;
+
+        const mapped = payload.logs
+          .map(mapBackofficeLogToBooking)
+          .filter((item): item is BookingItem => item !== null);
+
+        setBackofficeBookings(mapped);
+      } catch {
+        if (!cancelled) setBackofficeBookings([]);
+      }
     };
-    void load();
+
+    void loadBackofficeReservations();
+    return () => { cancelled = true; };
   }, []);
 
   // — Openclaw ping —
@@ -448,106 +392,11 @@ export default function Home() {
       }),
     );
   };
-
-  const handleVehicleDraftChange = (vehicleId: string, patch: Partial<VehicleDraft>) => {
-    setVehicleDrafts((current) => ({
-      ...current,
-      [vehicleId]: { ...current[vehicleId], ...patch },
-    }));
-  };
-
-  const handleAddParkingArea = async (value: string) => {
-    if (parkingOptions.areas.includes(value)) return;
-    try {
-      const response = await fetch("/api/vehicles/parking-options", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "AREA", value }),
-      });
-      if (response.ok) {
-        setParkingOptions((prev) => ({ ...prev, areas: [...prev.areas, value].sort() }));
-      }
-    } catch { /* silently ignore */ }
-  };
-
-  const handleDeleteParkingArea = async (value: string) => {
-    try {
-      const response = await fetch("/api/vehicles/parking-options", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "AREA", value }),
-      });
-      if (response.ok) {
-        setParkingOptions((prev) => ({ ...prev, areas: prev.areas.filter((a) => a !== value) }));
-      }
-    } catch { /* silently ignore */ }
-  };
-
-  const handleVehicleSave = async (vehicleId: string) => {
-    const draft = vehicleDrafts[vehicleId];
-    if (!draft) return;
-    setSavingVehicleId(vehicleId);
-    setFleetError(null);
-    try {
-      const response = await fetch(`/api/vehicles/${vehicleId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          parkingArea: draft.parkingArea.trim(),
-          parkingSpot: draft.parkingSpot.trim(),
-          operationalStatus: draft.operationalStatus,
-        }),
-      });
-      const payload = (await response.json()) as { ok: boolean; error?: string; vehicle?: FleetVehicle };
-      if (!response.ok || !payload.ok || !payload.vehicle) {
-        throw new Error(payload.error ?? "Mise à jour du véhicule impossible");
-      }
-      const updatedVehicle = payload.vehicle;
-      setFleetVehicles((current) =>
-        current.map((vehicle) => vehicle.id === vehicleId ? updatedVehicle : vehicle),
-      );
-      setVehicleDrafts((current) => ({
-        ...current,
-        [vehicleId]: {
-          parkingArea: updatedVehicle.parkingArea,
-          parkingSpot: updatedVehicle.parkingSpot,
-          operationalStatus: updatedVehicle.operationalStatus,
-        },
-      }));
-      const trimmedArea = updatedVehicle.parkingArea;
-      const trimmedSpot = updatedVehicle.parkingSpot;
-      setParkingOptions((prev) => ({
-        areas: trimmedArea && !prev.areas.includes(trimmedArea) ? [...prev.areas, trimmedArea].sort() : prev.areas,
-        spots: trimmedSpot && !prev.spots.includes(trimmedSpot) ? [...prev.spots, trimmedSpot].sort() : prev.spots,
-      }));
-    } catch (error) {
-      setFleetError(error instanceof Error ? error.message : "Mise à jour du véhicule impossible");
-    } finally {
-      setSavingVehicleId(null);
-    }
-  };
-
-  const desktopBottomRight = 1 - layout.desktopBottom;
   const tabletRightBottom = 1 - layout.tabletRightTop;
-
-  const sharedVehiclePanelProps = {
-    vehicles: visibleVehicles,
-    drafts: vehicleDrafts,
-    selectedBrand,
-    fleetLoading,
-    fleetError,
-    savingVehicleId,
-    parkingOptions,
-    onBrandChange: setSelectedBrand,
-    onDraftChange: handleVehicleDraftChange,
-    onSave: handleVehicleSave,
-    onAddParkingArea: handleAddParkingArea,
-    onDeleteParkingArea: handleDeleteParkingArea,
-  };
 
   const sharedDispatchPanelProps = {
     dispatchItems,
-    bookings,
+    bookings: dashboardBookings,
     dispatchFilter,
     selectedDispatchId,
     operators: dispatchOperators,
@@ -558,9 +407,8 @@ export default function Home() {
 
   const overviewProps = {
     today,
-    fleetVehicles,
-    fleetLoading,
-    openclawStatus,
+    fleetVehicles: overviewFleetVehicles,
+    fleetLoading: overviewFleetLoading,
   };
 
   return (
@@ -583,6 +431,9 @@ export default function Home() {
             <button type="button" className="vehicle-toggle cursor-pointer">
               Paramètres
             </button>
+            <Link href="/backoffice" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
+              Backoffice
+            </Link>
 
             <span className="nav-divider" aria-hidden="true" />
 
@@ -639,29 +490,13 @@ export default function Home() {
                 onPointerDown={(event) => startResize(event, "desktopLeftTop", "y", desktopLeftRef.current)}
               />
 
-              <div
-                ref={desktopBottomRef}
-                className="split-row"
-                style={{ gridTemplateColumns: `minmax(min-content, ${layout.desktopBottom}fr) 0.6rem minmax(min-content, ${desktopBottomRight}fr)` }}
-              >
-                <article className="dashboard-panel card p-4">
-                  <VehiclePanel {...sharedVehiclePanelProps} />
+              <div className="flex min-h-0 flex-col gap-[0.6rem]">
+                <article className="dashboard-panel card flex-1 p-4">
+                  <DispatchPanel {...sharedDispatchPanelProps} />
                 </article>
-
-                <Splitter
-                  axis="x"
-                  label="Redimensionner entre Véhicules et Dispatch"
-                  onPointerDown={(event) => startResize(event, "desktopBottom", "x", desktopBottomRef.current)}
-                />
-
-                <div className="flex min-h-0 flex-col gap-[0.6rem]">
-                  <article className="dashboard-panel card flex-1 p-4">
-                    <DispatchPanel {...sharedDispatchPanelProps} />
-                  </article>
-                  <article className="dashboard-panel card shrink-0 p-4">
-                    <PerformancePanel employees={employeeStats} size="compact" />
-                  </article>
-                </div>
+                <article className="dashboard-panel card shrink-0 p-4">
+                  <PerformancePanel employees={employeeStats} size="compact" />
+                </article>
               </div>
             </div>
 
@@ -672,7 +507,7 @@ export default function Home() {
             />
 
             <article ref={desktopRightRef} className="dashboard-panel card panel-priority p-4">
-              <ReservationsPanel bookings={bookings} size="full" />
+              <ReservationsPanel bookings={dashboardBookings} size="full" />
             </article>
           </section>
 
@@ -685,7 +520,7 @@ export default function Home() {
             <div
               ref={tabletLeftRef}
               className="split-column"
-              style={{ gridTemplateRows: "auto 0.6rem minmax(min-content, 1fr) 0.6rem minmax(min-content, 1fr)" }}
+              style={{ gridTemplateRows: "auto 0.6rem minmax(min-content, 1fr)" }}
             >
               <article className="dashboard-panel card p-3 md:p-4">
                 <OverviewPanel {...overviewProps} size="full" />
@@ -693,18 +528,8 @@ export default function Home() {
 
               <Splitter
                 axis="y"
-                label="Redimensionner entre Vue d'ensemble et Vehicules"
+                label="Redimensionner entre Vue d'ensemble et Dispatch"
                 onPointerDown={(event) => startResize(event, "tabletLeftTop", "y", tabletLeftRef.current)}
-              />
-
-              <article className="dashboard-panel card p-4">
-                <VehiclePanel {...sharedVehiclePanelProps} />
-              </article>
-
-              <Splitter
-                axis="y"
-                label="Redimensionner entre Vehicules et Dispatch"
-                onPointerDown={(event) => startResize(event, "tabletLeftMiddle", "y", tabletLeftRef.current)}
               />
 
               <article className="dashboard-panel card p-4">
@@ -724,7 +549,7 @@ export default function Home() {
               style={{ gridTemplateRows: `minmax(min-content, ${layout.tabletRightTop}fr) 0.6rem minmax(min-content, ${tabletRightBottom}fr)` }}
             >
               <article className="dashboard-panel card panel-priority p-4">
-                <ReservationsPanel bookings={bookings} size="full" />
+                <ReservationsPanel bookings={dashboardBookings} size="full" />
               </article>
 
               <Splitter
@@ -746,11 +571,7 @@ export default function Home() {
             </article>
 
             <article className="dashboard-panel card panel-priority p-4">
-              <ReservationsPanel bookings={bookings} size="compact" />
-            </article>
-
-            <article className="dashboard-panel card p-4">
-              <VehiclePanel {...sharedVehiclePanelProps} />
+              <ReservationsPanel bookings={dashboardBookings} size="compact" />
             </article>
 
             <article className="dashboard-panel card p-4">
@@ -766,3 +587,4 @@ export default function Home() {
     </div>
   );
 }
+

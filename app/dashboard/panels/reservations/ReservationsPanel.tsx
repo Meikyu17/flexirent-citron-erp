@@ -1,8 +1,7 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgencyBrand, BookingItem } from "../../shared/types";
-import { formatMoney } from "../../shared/utils";
 import "./reservations.css";
 
 function pickupTime(booking: BookingItem): string {
@@ -54,29 +53,94 @@ const platformLabel: Record<BookingItem["source"], string> = {
   "Fleetee B": "Fleetee",
   "Getaround": "Getaround",
   "Turo": "Turo",
+  "Direct": "Direct",
 };
 
 function sourceChips(booking: BookingItem): string[] {
   return [platformLabel[booking.source], agencyLabel[booking.agency]];
 }
 
-function sortAndGroup(bookings: BookingItem[]): { date: string; items: BookingItem[] }[] {
+function parseHourLabel(value: string): { hour: number; minute: number } | null {
+  const match = value.match(/(\d{1,2})h(\d{2})/);
+  if (!match) return null;
+  return { hour: Number(match[1]), minute: Number(match[2]) };
+}
+
+function bookingStartDate(booking: BookingItem): Date {
+  if (booking.startAtIso) {
+    const explicit = new Date(booking.startAtIso);
+    if (!Number.isNaN(explicit.getTime())) return explicit;
+  }
+
+  const [year, month, day] = booking.date.split("-").map(Number);
+  const parsedTime = parseHourLabel(pickupTime(booking));
+  const hour = parsedTime?.hour ?? 12;
+  const minute = parsedTime?.minute ?? 0;
+  return new Date(year, (month ?? 1) - 1, day ?? 1, hour, minute);
+}
+
+function bookingEndDate(booking: BookingItem): Date | null {
+  if (booking.endAtIso) {
+    const explicit = new Date(booking.endAtIso);
+    if (!Number.isNaN(explicit.getTime())) return explicit;
+  }
+
+  const dropoffTime = booking.dropoff.split(" / ")[1];
+  const parsedTime = parseHourLabel(dropoffTime ?? "");
+  if (!parsedTime) return null;
+  const [year, month, day] = booking.dropoffDate.split("-").map(Number);
+  return new Date(
+    year,
+    (month ?? 1) - 1,
+    day ?? 1,
+    parsedTime.hour,
+    parsedTime.minute,
+  );
+}
+
+function bookingDisplayDate(booking: BookingItem, now: Date): Date {
+  const start = bookingStartDate(booking);
+  const end = bookingEndDate(booking);
+  if (end && start.getTime() <= now.getTime()) {
+    return end;
+  }
+  return start;
+}
+
+function toIsoDate(date: Date): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function sortAndGroup(bookings: BookingItem[], now: Date): { date: string; items: BookingItem[] }[] {
   const sorted = [...bookings].sort((a, b) => {
-    const dateCompare = a.date.localeCompare(b.date);
-    if (dateCompare !== 0) return dateCompare;
-    return pickupTime(a).localeCompare(pickupTime(b));
+    const diff = bookingDisplayDate(a, now).getTime() - bookingDisplayDate(b, now).getTime();
+    if (diff !== 0) return diff;
+    return a.client.localeCompare(b.client, "fr");
   });
 
   const groups: { date: string; items: BookingItem[] }[] = [];
   for (const booking of sorted) {
+    const groupDate = toIsoDate(bookingDisplayDate(booking, now));
     const last = groups[groups.length - 1];
-    if (last && last.date === booking.date) {
+    if (last && last.date === groupDate) {
       last.items.push(booking);
     } else {
-      groups.push({ date: booking.date, items: [booking] });
+      groups.push({ date: groupDate, items: [booking] });
     }
   }
   return groups;
+}
+
+function isBackofficeBooking(booking: BookingItem): boolean {
+  return booking.id.startsWith("BO-");
+}
+
+function bookingRefLabel(booking: BookingItem): string {
+  if (isBackofficeBooking(booking)) return "Réservation backoffice";
+  return booking.id;
 }
 
 function formatDayLabel(isoDate: string): string {
@@ -110,7 +174,7 @@ function SmsModal({
         <div className="sms-modal-header">
           <div>
             <p className="text-base font-semibold">{booking.client}</p>
-            <p className="text-xs text-muted">{booking.car} · {booking.id}</p>
+            <p className="text-xs text-muted">{booking.car} · {bookingRefLabel(booking)}</p>
           </div>
           <button
             type="button"
@@ -145,7 +209,7 @@ function SmsModal({
   );
 }
 
-const PLATFORMS = ["Fleetee", "Getaround", "Turo"] as const;
+const PLATFORMS = ["Fleetee", "Getaround", "Turo", "Direct"] as const;
 type Platform = typeof PLATFORMS[number];
 
 type BookingMenuAction = {
@@ -182,18 +246,76 @@ export function ReservationsPanel({
   const [agencyFilter, setAgencyFilter] = useState<AgencyBrand | null>(null);
   const [platformFilter, setPlatformFilter] = useState<Platform | null>(null);
   const [openMenuBookingId, setOpenMenuBookingId] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [validatedBookingIds, setValidatedBookingIds] = useState<Set<string>>(
+    () => {
+      if (typeof window === "undefined") return new Set();
+      try {
+        const raw = localStorage.getItem("citron-validated-reservations");
+        if (!raw) return new Set();
+        const parsed = JSON.parse(raw) as string[];
+        return new Set(parsed);
+      } catch {
+        return new Set();
+      }
+    },
+  );
+
+  useEffect(() => {
+    localStorage.setItem(
+      "citron-validated-reservations",
+      JSON.stringify(Array.from(validatedBookingIds)),
+    );
+  }, [validatedBookingIds]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return bookings.filter((b) => {
+      if (validatedBookingIds.has(b.id)) return false;
       if (q && !b.client.toLowerCase().includes(q) && !b.plateNumber.toLowerCase().includes(q)) return false;
       if (agencyFilter && b.agency !== agencyFilter) return false;
       if (platformFilter && platformLabel[b.source] !== platformFilter) return false;
       return true;
     });
-  }, [bookings, search, agencyFilter, platformFilter]);
+  }, [bookings, search, agencyFilter, platformFilter, validatedBookingIds]);
 
-  const groups = sortAndGroup(filtered);
+  const groups = useMemo(() => sortAndGroup(filtered, new Date()), [filtered]);
+
+  useEffect(() => {
+    if (size !== "full") return;
+    const container = listRef.current;
+    if (!container || groups.length === 0) return;
+
+    const today = new Date();
+    const todayNoonTs = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      12,
+      0,
+      0,
+      0,
+    ).getTime();
+
+    let nearestDate: string | null = null;
+    let nearestDiff = Number.POSITIVE_INFINITY;
+
+    for (const group of groups) {
+      const groupTs = new Date(`${group.date}T12:00:00`).getTime();
+      const diff = Math.abs(groupTs - todayNoonTs);
+      if (diff < nearestDiff) {
+        nearestDiff = diff;
+        nearestDate = group.date;
+      }
+    }
+
+    if (!nearestDate) return;
+    const target = container.querySelector<HTMLElement>(
+      `[data-group-date="${nearestDate}"]`,
+    );
+    if (!target) return;
+    container.scrollTo({ top: Math.max(0, target.offsetTop - 8) });
+  }, [groups, size]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -211,6 +333,14 @@ export function ReservationsPanel({
   const handleBookingMenuAction = (booking: BookingItem, action: BookingMenuAction) => {
     setOpenMenuBookingId(null);
     console.info(`[reservations] action=${action.id} booking=${booking.id}`);
+  };
+
+  const handleValidateBooking = (bookingId: string) => {
+    setValidatedBookingIds((current) => {
+      const next = new Set(current);
+      next.add(bookingId);
+      return next;
+    });
   };
 
   return (
@@ -269,9 +399,12 @@ export function ReservationsPanel({
         </div>
       )}
 
-      <div className={size === "full" ? "custom-scrollbar min-h-0 flex-1 overflow-y-auto pr-2" : ""}>
+      <div
+        ref={size === "full" ? listRef : null}
+        className={size === "full" ? "custom-scrollbar min-h-0 flex-1 overflow-y-auto pr-2" : ""}
+      >
         {groups.map((group, groupIndex) => (
-          <div key={group.date}>
+          <div key={group.date} data-group-date={group.date}>
             {groupIndex > 0 && <DaySeparator date={group.date} />}
             {groupIndex === 0 && (
               <div className="reservations-day-separator reservations-day-separator--first">
@@ -288,14 +421,14 @@ export function ReservationsPanel({
                           {booking.pickup} / {booking.client}
                         </p>
                         <p className="text-sm text-muted">
-                          {booking.car} - {booking.id}
+                          {booking.car} - {bookingRefLabel(booking)}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         <span className={booking.type === "PICKUP" ? "booking-type-badge booking-type-pickup" : "booking-type-badge booking-type-return"}>
                           {booking.type === "PICKUP" ? "Remise de clé" : "Retour"}
                         </span>
-                        <span className="chip">{formatMoney(booking.amount)}</span>
+                        
                       </div>
                     </div>
                     {booking.type === "PICKUP" && (
@@ -324,7 +457,7 @@ export function ReservationsPanel({
                         <button
                           type="button"
                           className="reservation-overflow-trigger"
-                          aria-label={`Options reservation ${booking.id}`}
+                          aria-label={`Options reservation ${bookingRefLabel(booking)}`}
                           aria-haspopup="menu"
                           aria-expanded={openMenuBookingId === booking.id}
                           onClick={() =>
@@ -357,6 +490,23 @@ export function ReservationsPanel({
                         )}
                       </div>
                     </div>
+                    {(() => {
+                      const endDate = bookingEndDate(booking);
+                      const canValidate =
+                        endDate !== null && endDate.getTime() < Date.now();
+                      if (!canValidate) return null;
+                      return (
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            type="button"
+                            className="reservation-action-btn reservation-action-call"
+                            onClick={() => handleValidateBooking(booking.id)}
+                          >
+                            Valider la location
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <div key={booking.id} className="card bg-card-secondary p-3">
@@ -366,7 +516,7 @@ export function ReservationsPanel({
                           {booking.pickup} / {booking.client}
                         </p>
                         <p className="mt-0.5 text-sm text-muted">
-                          {booking.car} - {booking.id}
+                          {booking.car} - {bookingRefLabel(booking)}
                         </p>
                       </div>
                       <span className={booking.type === "PICKUP" ? "booking-type-badge booking-type-pickup" : "booking-type-badge booking-type-return"}>
@@ -379,7 +529,7 @@ export function ReservationsPanel({
                         <button
                           type="button"
                           className="reservation-overflow-trigger"
-                          aria-label={`Options reservation ${booking.id}`}
+                          aria-label={`Options reservation ${bookingRefLabel(booking)}`}
                           aria-haspopup="menu"
                           aria-expanded={openMenuBookingId === booking.id}
                           onClick={() =>
@@ -412,6 +562,23 @@ export function ReservationsPanel({
                         )}
                       </div>
                     </div>
+                    {(() => {
+                      const endDate = bookingEndDate(booking);
+                      const canValidate =
+                        endDate !== null && endDate.getTime() < Date.now();
+                      if (!canValidate) return null;
+                      return (
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            type="button"
+                            className="reservation-action-btn reservation-action-call"
+                            onClick={() => handleValidateBooking(booking.id)}
+                          >
+                            Valider la location
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )
               )}
@@ -422,3 +589,4 @@ export function ReservationsPanel({
     </>
   );
 }
+

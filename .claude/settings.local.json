@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(start \"\" \"C:/Program Files/Docker/Docker/Docker Desktop.exe\")",
+      "Bash(npm run:*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":5432\")",
+      "Bash(tasklist /FI \"PID eq 33164\")",
+      "Bash(tasklist /FI \"PID eq 6236\")",
+      "Bash(docker exec:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npm install:*)",
+      "Bash(./node_modules/.bin/prisma migrate:*)",
+      "Bash(node scripts/seed-demo-fleet.mjs)",
+      "Bash(./node_modules/.bin/prisma generate:*)",
+      "Bash(findstr \":3000\")",
+      "Bash(node --input-type=module --eval ':*)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(cmd /c \"taskkill /F /IM node.exe\")",
+      "Bash(cmd /c \"taskkill /F /IM node.exe 2>&1\")",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force; Write-Host 'stopped'\")"
+    ]
+  }
+}
