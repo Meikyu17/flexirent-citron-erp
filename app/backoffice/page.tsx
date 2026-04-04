@@ -314,6 +314,7 @@ export default function BackofficePage() {
         }
         const vehicleList = vData.vehicles;
         setVehicles(vehicleList);
+        setCollapsedIds(new Set(vehicleList.map((v) => v.id)));
         setDrafts(
           Object.fromEntries(
             vehicleList.map((v) => [

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -78,7 +78,6 @@ export default function ClientsPage() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
   const [loggingOut, setLoggingOut] = useState(false);
 
   const loadCustomers = async (q = "") => {
@@ -208,212 +207,190 @@ export default function ClientsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="nav-button-secondary text-sm">← Dashboard</Link>
-          <h1 className="text-lg font-semibold">Carnet clients</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/backoffice" className="nav-button-secondary text-sm">Backoffice</Link>
-          <button
-            type="button"
-            className="nav-button-secondary text-sm"
-            onClick={() => void handleLogout()}
-            disabled={loggingOut}
-          >
-            {loggingOut ? "…" : "Déconnexion"}
-          </button>
-        </div>
-      </header>
+    <div className="dashboard-shell min-h-screen px-3 py-4" style={{ fontFamily: "var(--font-geist-sans), Arial, sans-serif" }}>
+      <div className="mx-auto w-full max-w-2xl flex flex-col gap-6">
 
-      <main className="mx-auto max-w-5xl px-4 py-6 space-y-4">
-        <div className="flex flex-wrap gap-2 items-center justify-between">
+        {/* Header */}
+        <header className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted">Citron ERP</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Carnet clients</h1>
+          </div>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            <Link href="/backoffice" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>Backoffice</Link>
+            <Link href="/pricing" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>Tarifs</Link>
+            <Link href="/" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>Dashboard</Link>
+            <button type="button" className="nav-button-danger cursor-pointer" onClick={() => void handleLogout()} disabled={loggingOut}>
+              {loggingOut ? "…" : "Déconnexion"}
+            </button>
+          </div>
+        </header>
+
+        {/* Search + add */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
             type="search"
             placeholder="Rechercher un client…"
-            className="input flex-1 min-w-[200px]"
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
+            style={{ ...inputStyle, flex: 1 }}
           />
           <button
             type="button"
-            className="nav-button text-sm"
-            onClick={() => { setShowForm(true); setForm(emptyForm); setFormError(null); }}
+            onClick={() => { setShowForm((v) => !v); setForm(emptyForm); setFormError(null); }}
+            style={{ ...primaryButtonStyle, width: "auto", padding: "0.6rem 1.2rem", whiteSpace: "nowrap" }}
           >
-            + Nouveau client
+            {showForm ? "Annuler" : "+ Nouveau client"}
           </button>
         </div>
 
+        {/* Create form */}
         {showForm && (
-          <div className="card p-4 space-y-3">
-            <h2 className="font-semibold">Nouveau client</h2>
+          <section className="card p-4 flex flex-col gap-4">
+            <h2 className="text-base font-semibold">Nouveau client</h2>
             <CustomerFormFields form={form} onChange={setForm} />
-            {formError && <p className="text-sm text-red-500">{formError}</p>}
-            <div className="flex gap-2">
-              <button type="button" className="nav-button flex-1" onClick={() => void handleCreate()} disabled={formLoading}>
-                {formLoading ? "Enregistrement…" : "Créer"}
-              </button>
-              <button type="button" className="nav-button-secondary flex-1" onClick={() => setShowForm(false)}>
-                Annuler
-              </button>
-            </div>
-          </div>
+            {formError && <p className="text-xs" style={{ color: "var(--danger)" }}>{formError}</p>}
+            <button type="button" disabled={formLoading} onClick={() => void handleCreate()} style={primaryButtonStyle}>
+              {formLoading ? "Enregistrement…" : "Créer le client"}
+            </button>
+          </section>
         )}
 
+        {/* List */}
         {loading ? (
-          <p className="text-sm text-muted">Chargement…</p>
+          <p className="text-center text-muted py-8">Chargement…</p>
         ) : customers.length === 0 ? (
-          <p className="text-sm text-muted">Aucun client trouvé.</p>
+          <p className="text-sm text-center py-6" style={{ color: "var(--muted)" }}>Aucun client trouvé.</p>
         ) : (
-          <div className="space-y-2">
-            <p className="text-sm text-muted">{customers.length} client{customers.length > 1 ? "s" : ""}</p>
+          <section className="flex flex-col gap-3">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted">{customers.length} client{customers.length > 1 ? "s" : ""}</p>
             {customers.map((c) => (
-              <div key={c.id} className="card p-4">
+              <div key={c.id} className="card p-4 flex flex-col gap-3">
                 {editingId === c.id ? (
-                  <div className="space-y-3">
+                  <>
                     <CustomerFormFields form={editForm} onChange={setEditForm} />
-                    {editError && <p className="text-sm text-red-500">{editError}</p>}
-                    <div className="flex gap-2">
-                      <button type="button" className="nav-button flex-1" onClick={() => void handleSaveEdit()} disabled={editLoading}>
+                    {editError && <p className="text-xs" style={{ color: "var(--danger)" }}>{editError}</p>}
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button type="button" className="vehicle-toggle cursor-pointer flex-1" onClick={() => setEditingId(null)}>Annuler</button>
+                      <button type="button" disabled={editLoading} onClick={() => void handleSaveEdit()} style={{ ...primaryButtonStyle, flex: 1 }}>
                         {editLoading ? "Enregistrement…" : "Enregistrer"}
                       </button>
-                      <button type="button" className="nav-button-secondary flex-1" onClick={() => setEditingId(null)}>
-                        Annuler
-                      </button>
                     </div>
-                  </div>
+                  </>
                 ) : (
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <p className="font-medium">
-                        {c.firstName} {c.lastName}
-                        <span className="ml-2 chip text-xs">{c.type === "PROFESSIONAL" ? "Pro" : "Particulier"}</span>
-                        {c.agencyBrand && <span className="ml-1 chip text-xs">{agencyLabel[c.agencyBrand]}</span>}
-                      </p>
-                      {c.phone && <p className="text-sm text-muted">{c.phone}</p>}
-                      {c.email && <p className="text-sm text-muted">{c.email}</p>}
-                      {c.address && <p className="text-sm text-muted">{c.address}</p>}
-                      <p className="text-xs text-muted">
-                        {c.reservationCount} résa
-                        {c.licenseAgeDays ? ` · Permis ${Math.round(c.licenseAgeDays / 365)} an${Math.round(c.licenseAgeDays / 365) > 1 ? "s" : ""}` : ""}
-                      </p>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button type="button" className="vehicle-toggle text-sm cursor-pointer" onClick={() => startEdit(c)}>
-                        Modifier
-                      </button>
-                      {confirmDeleteId === c.id ? (
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            className="nav-button-danger text-sm cursor-pointer"
-                            onClick={() => void handleDelete(c.id)}
-                            disabled={deletingId === c.id}
-                          >
-                            {deletingId === c.id ? "…" : "Confirmer"}
-                          </button>
-                          <button type="button" className="vehicle-toggle text-sm cursor-pointer" onClick={() => setConfirmDeleteId(null)}>
-                            Annuler
-                          </button>
+                  <>
+                    <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-start">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="text-sm font-semibold">{c.firstName} {c.lastName}</p>
+                          <span className="chip" style={{ fontSize: "0.72rem" }}>{c.type === "PROFESSIONAL" ? "Pro" : "Particulier"}</span>
+                          {c.agencyBrand && <span className="chip" style={{ fontSize: "0.72rem" }}>{agencyLabel[c.agencyBrand]}</span>}
                         </div>
-                      ) : (
-                        <button type="button" className="nav-button-danger text-sm cursor-pointer" onClick={() => setConfirmDeleteId(c.id)}>
-                          Supprimer
-                        </button>
-                      )}
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: "var(--muted)" }}>
+                          {c.phone && <span>{c.phone}</span>}
+                          {c.email && <span>{c.email}</span>}
+                          {c.address && <span>{c.address}</span>}
+                          <span>{c.reservationCount} résa{c.licenseAgeDays ? ` · Permis ${Math.round(c.licenseAgeDays / 365)} an${Math.round(c.licenseAgeDays / 365) > 1 ? "s" : ""}` : ""}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button type="button" className="vehicle-toggle cursor-pointer" onClick={() => startEdit(c)}>Modifier</button>
+                        {confirmDeleteId === c.id ? (
+                          <>
+                            <button type="button" className="nav-button-danger cursor-pointer" onClick={() => void handleDelete(c.id)} disabled={deletingId === c.id}>
+                              {deletingId === c.id ? "…" : "Confirmer"}
+                            </button>
+                            <button type="button" className="vehicle-toggle cursor-pointer" onClick={() => setConfirmDeleteId(null)}>✕</button>
+                          </>
+                        ) : (
+                          <button type="button" className="nav-button-danger cursor-pointer" onClick={() => setConfirmDeleteId(c.id)}>Supprimer</button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             ))}
-          </div>
+          </section>
         )}
-      </main>
-    </div>
-  );
-}
-
-function CustomerFormFields({
-  form,
-  onChange,
-}: {
-  form: CustomerForm;
-  onChange: (f: CustomerForm) => void;
-}) {
-  const set = (key: keyof CustomerForm, value: string) =>
-    onChange({ ...form, [key]: value });
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div className="flex gap-2 sm:col-span-2">
-        <button
-          type="button"
-          className={form.type === "INDIVIDUAL" ? "nav-button flex-1" : "nav-button-secondary flex-1"}
-          onClick={() => set("type", "INDIVIDUAL")}
-        >
-          Particulier
-        </button>
-        <button
-          type="button"
-          className={form.type === "PROFESSIONAL" ? "nav-button flex-1" : "nav-button-secondary flex-1"}
-          onClick={() => set("type", "PROFESSIONAL")}
-        >
-          Professionnel
-        </button>
       </div>
-      <input
-        type="text"
-        placeholder="Prénom *"
-        className="input"
-        value={form.firstName}
-        onChange={(e) => set("firstName", e.target.value)}
-      />
-      <input
-        type="text"
-        placeholder="Nom *"
-        className="input"
-        value={form.lastName}
-        onChange={(e) => set("lastName", e.target.value)}
-      />
-      <input
-        type="tel"
-        placeholder="Téléphone"
-        className="input"
-        value={form.phone}
-        onChange={(e) => set("phone", e.target.value)}
-      />
-      <input
-        type="email"
-        placeholder="Email"
-        className="input"
-        value={form.email}
-        onChange={(e) => set("email", e.target.value)}
-      />
-      <input
-        type="text"
-        placeholder="Adresse"
-        className="input sm:col-span-2"
-        value={form.address}
-        onChange={(e) => set("address", e.target.value)}
-      />
-      <select
-        className="input"
-        value={form.agencyBrand}
-        onChange={(e) => set("agencyBrand", e.target.value)}
-      >
-        <option value="">Agence (optionnel)</option>
-        <option value="CITRON_LOCATION">Citron Location</option>
-        <option value="FLEXIRENT">Flexirent</option>
-      </select>
-      <input
-        type="number"
-        placeholder="Ancienneté permis (années)"
-        className="input"
-        min="0"
-        value={form.licenseYears}
-        onChange={(e) => set("licenseYears", e.target.value)}
-      />
     </div>
   );
 }
+
+function CustomerFormFields({ form, onChange }: { form: CustomerForm; onChange: (f: CustomerForm) => void }) {
+  const set = (key: keyof CustomerForm, value: string) => onChange({ ...form, [key]: value });
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>Type</label>
+        <div className="flex gap-2">
+          <button type="button" className={`vehicle-toggle cursor-pointer flex-1 ${form.type === "INDIVIDUAL" ? "vehicle-toggle-active" : ""}`} onClick={() => set("type", "INDIVIDUAL")}>Particulier</button>
+          <button type="button" className={`vehicle-toggle cursor-pointer flex-1 ${form.type === "PROFESSIONAL" ? "vehicle-toggle-active" : ""}`} onClick={() => set("type", "PROFESSIONAL")}>Professionnel</button>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-1.5 flex-1">
+          <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>Prénom *</label>
+          <input type="text" placeholder="Prénom" value={form.firstName} onChange={(e) => set("firstName", e.target.value)} style={inputStyle} />
+        </div>
+        <div className="flex flex-col gap-1.5 flex-1">
+          <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>Nom *</label>
+          <input type="text" placeholder="Nom" value={form.lastName} onChange={(e) => set("lastName", e.target.value)} style={inputStyle} />
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-1.5 flex-1">
+          <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>Téléphone</label>
+          <input type="tel" placeholder="06 00 00 00 00" value={form.phone} onChange={(e) => set("phone", e.target.value)} style={inputStyle} />
+        </div>
+        <div className="flex flex-col gap-1.5 flex-1">
+          <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>Email</label>
+          <input type="email" placeholder="email@exemple.fr" value={form.email} onChange={(e) => set("email", e.target.value)} style={inputStyle} />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>Adresse</label>
+        <input type="text" placeholder="12 Rue de la Paix, Toulouse" value={form.address} onChange={(e) => set("address", e.target.value)} style={inputStyle} />
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-1.5 flex-1">
+          <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>Agence</label>
+          <div className="flex gap-2">
+            <button type="button" className={`vehicle-toggle cursor-pointer flex-1 ${form.agencyBrand === "" ? "vehicle-toggle-active" : ""}`} onClick={() => set("agencyBrand", "")}>Toutes</button>
+            <button type="button" className={`vehicle-toggle cursor-pointer flex-1 ${form.agencyBrand === "CITRON_LOCATION" ? "vehicle-toggle-active" : ""}`} onClick={() => set("agencyBrand", "CITRON_LOCATION")}>Citron</button>
+            <button type="button" className={`vehicle-toggle cursor-pointer flex-1 ${form.agencyBrand === "FLEXIRENT" ? "vehicle-toggle-active" : ""}`} onClick={() => set("agencyBrand", "FLEXIRENT")}>Flexi</button>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5 flex-1">
+          <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>Ancienneté permis (années)</label>
+          <input type="number" placeholder="ex : 3" min="0" value={form.licenseYears} onChange={(e) => set("licenseYears", e.target.value)} style={inputStyle} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  background: "var(--card-secondary)",
+  border: "1px solid var(--border)",
+  borderRadius: "0.65rem",
+  padding: "0.6rem 0.75rem",
+  fontSize: "0.9rem",
+  color: "var(--foreground)",
+  width: "100%",
+  outline: "none",
+};
+
+const primaryButtonStyle: React.CSSProperties = {
+  background: "var(--accent)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "0.65rem",
+  padding: "0.7rem 1rem",
+  fontWeight: 600,
+  fontSize: "0.9rem",
+  cursor: "pointer",
+  width: "100%",
+  opacity: 1,
+};

@@ -30,6 +30,7 @@ import { OverviewPanel } from "./dashboard/panels/overview/OverviewPanel";
 import { DispatchPanel } from "./dashboard/panels/dispatch/DispatchPanel";
 import { ReservationsPanel } from "./dashboard/panels/reservations/ReservationsPanel";
 import { TodoPanel, type TodoPanelTask } from "./dashboard/panels/todo/TodoPanel";
+import { QuickReservationModal } from "./dashboard/shared/QuickReservationModal";
 
 const bookings: BookingItem[] = [];
 
@@ -163,8 +164,7 @@ export default function Home() {
   const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
   const [dispatchFilter, setDispatchFilter] = useState<"À assigner" | "Assigné" | null>(null);
   const [dispatchCollapsed, setDispatchCollapsed] = useState(false);
-
-
+  const [showReservationModal, setShowReservationModal] = useState(false);
 
   const today = new Date().toLocaleDateString("fr-FR", {
     weekday: "long",
@@ -467,8 +467,26 @@ export default function Home() {
     fleetLoading: overviewFleetLoading,
   };
 
+  const handleReservationSuccess = () => {
+    // Reload backoffice bookings so the new reservation appears in the panel
+    fetch("/api/backoffice/logs?limit=300", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ ok: boolean; logs?: BackofficeReservationLog[] }>)
+      .then((d) => {
+        if (!d.ok || !d.logs) return;
+        const mapped = d.logs.map(mapBackofficeLogToBooking).filter((b): b is BookingItem => b !== null);
+        setBackofficeBookings(mapped);
+      })
+      .catch(() => {});
+  };
+
   return (
     <div className="dashboard-shell min-h-screen px-3 py-3 md:px-5 md:py-5 lg:px-6">
+      {showReservationModal && (
+        <QuickReservationModal
+          onClose={() => setShowReservationModal(false)}
+          onSuccess={handleReservationSuccess}
+        />
+      )}
       <main className="mx-auto flex min-h-[calc(100vh-1.5rem)] w-full max-w-[1800px] flex-col gap-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -487,6 +505,23 @@ export default function Home() {
             <Link href="/settings" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
               Paramètres
             </Link>
+            <button
+              type="button"
+              style={{
+                background: "var(--accent)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "0.65rem",
+                minHeight: "2.2rem",
+                padding: "0.45rem 0.9rem",
+                fontSize: "0.83rem",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+              onClick={() => setShowReservationModal(true)}
+            >
+              + Réservation
+            </button>
             <Link href="/backoffice" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
               Backoffice
             </Link>
