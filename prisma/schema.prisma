@@ -88,18 +88,19 @@ model Vehicle {
 }
 
 model VehicleStatusLog {
-  id            String                   @id @default(cuid())
-  vehicleId     String
-  vehicle       Vehicle                  @relation(fields: [vehicleId], references: [id])
-  status        VehicleOperationalStatus
-  customerName  String?
-  customerPhone String?
-  startsAt      DateTime?
-  endsAt        DateTime?
-  agencyBrand   AgencyBrand
-  platform      RentalPlatform?
-  notes         String?
-  createdAt     DateTime                 @default(now())
+  id                    String                   @id @default(cuid())
+  vehicleId             String
+  vehicle               Vehicle                  @relation(fields: [vehicleId], references: [id])
+  status                VehicleOperationalStatus
+  customerName          String?
+  customerPhone         String?
+  startsAt              DateTime?
+  endsAt                DateTime?
+  agencyBrand           AgencyBrand
+  platform              RentalPlatform?
+  notes                 String?
+  assignedOperatorName  String?
+  createdAt             DateTime                 @default(now())
 }
 
 model Reservation {

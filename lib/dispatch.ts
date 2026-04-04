@@ -131,6 +131,13 @@ export async function listActiveStatusLogMissions() {
   });
 }
 
+export async function setStatusLogOperator(logId: string, operatorName: string | null) {
+  return prisma.vehicleStatusLog.update({
+    where: { id: logId },
+    data: { assignedOperatorName: operatorName },
+  });
+}
+
 export function serializeStatusLogMission(row: StatusLogRow): {
   dispatchItem: DispatchItem;
   booking: BookingItem;
@@ -162,12 +169,13 @@ export function serializeStatusLogMission(row: StatusLogRow): {
     endAtIso: endsAt?.toISOString(),
   };
 
+  const assignedName = row.assignedOperatorName ?? null;
   const dispatchItem: DispatchItem = {
     id: `log-${row.id}`,
     bookingRef: `log-${row.id}`,
     mission: missionLabel,
-    members: [],
-    state: "À assigner",
+    members: assignedName ? [assignedName] : [],
+    state: assignedName ? "Assigné" : "À assigner",
   };
 
   return { dispatchItem, booking };

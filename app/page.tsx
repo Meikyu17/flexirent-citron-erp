@@ -433,7 +433,7 @@ export default function Home() {
     void fetch(`/api/dispatch/items/${selectedDispatchId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ operatorId }),
+      body: JSON.stringify({ operatorId, operatorName: isAssigned ? null : name }),
     }).catch((err) => console.error("Dispatch assign failed", err));
   };
   const tabletRightBottom = 1 - layout.tabletRightTop;
