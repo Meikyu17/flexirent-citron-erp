@@ -12,7 +12,6 @@ import type {
   AgencyBrand,
   BookingItem,
   DispatchItem,
-  EmployeeStat,
 } from "./dashboard/shared/types";
 import {
   clamp,
@@ -36,7 +35,6 @@ const bookings: BookingItem[] = [];
 
 const initialDispatches: DispatchItem[] = [];
 
-const employeeStats: EmployeeStat[] = [];
 
 type BackofficeReservationLog = {
   id: string;
@@ -47,6 +45,8 @@ type BackofficeReservationLog = {
   customerName: string | null;
   agencyBrand: AgencyBrand;
   platform: "GETAROUND" | "FLEETEE" | "TURO" | "DIRECT" | null;
+  pickupAddress: string | null;
+  returnAddress: string | null;
 };
 
 type OverviewFleetVehicle = {
@@ -91,13 +91,16 @@ function mapBackofficeLogToBooking(log: BackofficeReservationLog): BookingItem |
   const dropoffRef = end ?? start;
   const dropoffTime = toHourLabel(dropoffRef);
 
+  const pickupLoc = log.pickupAddress?.trim() || "Backoffice";
+  const returnLoc = log.returnAddress?.trim() || "Backoffice";
+
   return {
     id: `BO-${log.id}`,
     date: toLocalIsoDate(start),
     type,
     client: log.customerName?.trim() || "Client backoffice",
-    pickup: `Backoffice / ${pickupTime}`,
-    dropoff: `Backoffice / ${dropoffTime}`,
+    pickup: `${pickupLoc} / ${pickupTime}`,
+    dropoff: `${returnLoc} / ${dropoffTime}`,
     dropoffDate: toLocalIsoDate(dropoffRef),
     car: log.vehicle.model,
     plateNumber: log.vehicle.plateNumber,
@@ -168,8 +171,6 @@ export default function Home() {
     day: "numeric",
     month: "long",
   });
-
-  const operators = employeeStats.map((e) => e.name);
 
   // — Layout persistence —
   useEffect(() => {
@@ -345,8 +346,8 @@ export default function Home() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            operators: operators,
-            bookings,
+            operators: dispatchOperators.map((o) => o.name),
+            bookings: dispatchBookings,
             dispatchItems,
           }),
         });
@@ -365,7 +366,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [dispatchItems, operators]);
+  }, [dispatchItems, dispatchBookings, dispatchOperators]);
 
   // — Resize —
   useEffect(() => {
