@@ -36,7 +36,7 @@ services:
       [
         "sh",
         "-c",
-        "for i in 1 2 3 4 5 6 7 8 9 10; do npx prisma migrate deploy && exit 0; echo \"DB non prete, nouvelle tentative dans 3s ($$i/10)\"; sleep 3; done; echo 'Echec migration apres 10 tentatives'; exit 1",
+        "for i in 1 2 3 4 5 6 7 8 9 10; do npx prisma migrate deploy && node scripts/seed-default-agencies.mjs && exit 0; echo \"DB non prete, nouvelle tentative dans 3s ($$i/10)\"; sleep 3; done; echo 'Echec migration apres 10 tentatives'; exit 1",
       ]
     networks:
       - citron-network

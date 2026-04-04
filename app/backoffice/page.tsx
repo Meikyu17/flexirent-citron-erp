@@ -135,6 +135,15 @@ function computeReservationStatusFromInputs(
   return end >= now ? "IN_RENT" : "RESERVED";
 }
 
+function formatPlateNumber(raw: string): string {
+  // Keep only letters and digits, uppercase
+  const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  // Format: AA-123-AA (SIV format)
+  if (clean.length <= 2) return clean;
+  if (clean.length <= 5) return `${clean.slice(0, 2)}-${clean.slice(2)}`;
+  return `${clean.slice(0, 2)}-${clean.slice(2, 5)}-${clean.slice(5, 7)}`;
+}
+
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("fr-FR", {
@@ -975,7 +984,7 @@ export default function BackofficePage() {
                       type="text"
                       placeholder="ex : AB-123-CD"
                       value={addForm.plateNumber}
-                      onChange={(e) => setAddForm((f) => ({ ...f, plateNumber: e.target.value }))}
+                      onChange={(e) => setAddForm((f) => ({ ...f, plateNumber: formatPlateNumber(e.target.value) }))}
                       style={inputStyle}
                       required
                     />
