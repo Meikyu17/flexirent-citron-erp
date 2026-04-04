@@ -146,7 +146,7 @@ export default function Home() {
   const [viewport, setViewport] = useState<"mobile" | "tablet" | "desktop">(getViewport);
   const [layout, setLayout] = useState<SplitLayout>(defaultLayout);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<string>("light");
   const [loggingOut, setLoggingOut] = useState(false);
   const [overviewFleetVehicles, setOverviewFleetVehicles] = useState<OverviewFleetVehicle[]>([]);
   const [overviewFleetLoading, setOverviewFleetLoading] = useState(true);
@@ -156,6 +156,32 @@ export default function Home() {
   );
   const [relativeNow, setRelativeNow] = useState(Date.now());
   const [tasks, setTasks] = useState<TodoPanelTask[]>([]);
+  const [panelConfig, setPanelConfig] = useState<Record<string, boolean>>({
+    overview: true, dispatch: true, reservations: true, todo: true,
+  });
+
+  useEffect(() => {
+    const raw = localStorage.getItem("citron-panel-config-v1");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { id: string; visible: boolean }[];
+      const map: Record<string, boolean> = {};
+      for (const p of parsed) map[p.id] = p.visible;
+      setPanelConfig((prev) => ({ ...prev, ...map }));
+    } catch { /* ignore */ }
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== "citron-panel-config-v1" || !e.newValue) return;
+      try {
+        const parsed = JSON.parse(e.newValue) as { id: string; visible: boolean }[];
+        const map: Record<string, boolean> = {};
+        for (const p of parsed) map[p.id] = p.visible;
+        setPanelConfig((prev) => ({ ...prev, ...map }));
+      } catch { /* ignore */ }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const [dispatchItems, setDispatchItems] = useState<DispatchItem[]>(initialDispatches);
   const [backofficeBookings, setBackofficeBookings] = useState<BookingItem[]>([]);
@@ -200,7 +226,7 @@ export default function Home() {
   // — Theme —
   useEffect(() => {
     const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    const storedTheme = localStorage.getItem("citron-theme") as "light" | "dark" | null;
+    const storedTheme = localStorage.getItem("citron-theme");
     setTheme(storedTheme ?? preferredTheme);
   }, []);
 
@@ -208,6 +234,15 @@ export default function Home() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("citron-theme", theme);
   }, [theme]);
+
+  // Sync theme if changed in settings tab
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "citron-theme" && e.newValue) setTheme(e.newValue);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -493,9 +528,9 @@ export default function Home() {
             <button type="button" className="vehicle-toggle cursor-pointer">
               Profil
             </button>
-            <button type="button" className="vehicle-toggle cursor-pointer">
+            <Link href="/settings" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
               Paramètres
-            </button>
+            </Link>
             <Link href="/backoffice" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
               Backoffice
             </Link>
@@ -517,7 +552,12 @@ export default function Home() {
             <button
               type="button"
               className="vehicle-toggle cursor-pointer"
-              onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+              onClick={() => {
+                const next = theme === "light" ? "dark" : "light";
+                setTheme(next);
+                document.documentElement.setAttribute("data-theme", next);
+                localStorage.setItem("citron-theme", next);
+              }}
             >
               {theme === "light" ? "☽ Sombre" : "☀ Clair"}
             </button>
@@ -548,9 +588,11 @@ export default function Home() {
                 gridTemplateRows: `minmax(min-content, ${layout.desktopLeftTop}fr) 0.6rem minmax(min-content, ${1 - layout.desktopLeftTop}fr)`,
               }}
             >
-              <article className="dashboard-panel card p-3 md:p-4">
-                <OverviewPanel {...overviewProps} size="full" />
-              </article>
+              {panelConfig.overview && (
+                <article className="dashboard-panel card p-3 md:p-4">
+                  <OverviewPanel {...overviewProps} size="full" />
+                </article>
+              )}
 
               <Splitter
                 axis="y"
@@ -559,12 +601,16 @@ export default function Home() {
               />
 
               <div className="flex min-h-0 flex-col gap-[0.6rem]">
-                <article className="dashboard-panel card flex-1 p-4">
-                  <DispatchPanel {...sharedDispatchPanelProps} />
-                </article>
-                <article className="dashboard-panel card shrink-0 p-4">
-                  <TodoPanel tasks={tasks} size="compact" onStatusChange={handleTaskStatusChange} />
-                </article>
+                {panelConfig.dispatch && (
+                  <article className="dashboard-panel card flex-1 p-4">
+                    <DispatchPanel {...sharedDispatchPanelProps} />
+                  </article>
+                )}
+                {panelConfig.todo && (
+                  <article className="dashboard-panel card shrink-0 p-4">
+                    <TodoPanel tasks={tasks} size="compact" onStatusChange={handleTaskStatusChange} />
+                  </article>
+                )}
               </div>
             </div>
 
@@ -574,9 +620,11 @@ export default function Home() {
               onPointerDown={(event) => startResize(event, "desktopMain", "x", desktopRootRef.current)}
             />
 
-            <article ref={desktopRightRef} className="dashboard-panel card panel-priority p-4">
-              <ReservationsPanel bookings={backofficeBookings} size="full" />
-            </article>
+            {panelConfig.reservations && (
+              <article ref={desktopRightRef} className="dashboard-panel card panel-priority p-4">
+                <ReservationsPanel bookings={backofficeBookings} size="full" />
+              </article>
+            )}
           </section>
 
         ) : viewport === "tablet" ? (
@@ -590,9 +638,11 @@ export default function Home() {
               className="split-column"
               style={{ gridTemplateRows: "auto 0.6rem minmax(min-content, 1fr)" }}
             >
-              <article className="dashboard-panel card p-3 md:p-4">
-                <OverviewPanel {...overviewProps} size="full" />
-              </article>
+              {panelConfig.overview && (
+                <article className="dashboard-panel card p-3 md:p-4">
+                  <OverviewPanel {...overviewProps} size="full" />
+                </article>
+              )}
 
               <Splitter
                 axis="y"
@@ -600,9 +650,11 @@ export default function Home() {
                 onPointerDown={(event) => startResize(event, "tabletLeftTop", "y", tabletLeftRef.current)}
               />
 
-              <article className="dashboard-panel card p-4">
-                <DispatchPanel {...sharedDispatchPanelProps} />
-              </article>
+              {panelConfig.dispatch && (
+                <article className="dashboard-panel card p-4">
+                  <DispatchPanel {...sharedDispatchPanelProps} />
+                </article>
+              )}
             </div>
 
             <Splitter
@@ -616,9 +668,11 @@ export default function Home() {
               className="split-column"
               style={{ gridTemplateRows: `minmax(min-content, ${layout.tabletRightTop}fr) 0.6rem minmax(min-content, ${tabletRightBottom}fr)` }}
             >
-              <article className="dashboard-panel card panel-priority p-4">
-                <ReservationsPanel bookings={backofficeBookings} size="full" />
-              </article>
+              {panelConfig.reservations && (
+                <article className="dashboard-panel card panel-priority p-4">
+                  <ReservationsPanel bookings={backofficeBookings} size="full" />
+                </article>
+              )}
 
               <Splitter
                 axis="y"
@@ -626,29 +680,36 @@ export default function Home() {
                 onPointerDown={(event) => startResize(event, "tabletRightTop", "y", tabletRightRef.current)}
               />
 
-              <article className="dashboard-panel card p-4">
-                <TodoPanel tasks={tasks} size="full" onStatusChange={handleTaskStatusChange} />
-              </article>
+              {panelConfig.todo && (
+                <article className="dashboard-panel card p-4">
+                  <TodoPanel tasks={tasks} size="full" onStatusChange={handleTaskStatusChange} />
+                </article>
+              )}
             </div>
           </section>
 
         ) : (
           <section className="mobile-stack flex-1">
-            <article className="dashboard-panel card p-4">
-              <OverviewPanel {...overviewProps} size="compact" />
-            </article>
-
-            <article className="dashboard-panel card panel-priority p-4">
-              <ReservationsPanel bookings={backofficeBookings} size="compact" />
-            </article>
-
-            <article className="dashboard-panel card p-4">
-              <DispatchPanel {...sharedDispatchPanelProps} />
-            </article>
-
-            <article className="dashboard-panel card p-4">
-              <TodoPanel tasks={tasks} size="compact" onStatusChange={handleTaskStatusChange} />
-            </article>
+            {panelConfig.overview && (
+              <article className="dashboard-panel card p-4">
+                <OverviewPanel {...overviewProps} size="compact" />
+              </article>
+            )}
+            {panelConfig.reservations && (
+              <article className="dashboard-panel card panel-priority p-4">
+                <ReservationsPanel bookings={backofficeBookings} size="compact" />
+              </article>
+            )}
+            {panelConfig.dispatch && (
+              <article className="dashboard-panel card p-4">
+                <DispatchPanel {...sharedDispatchPanelProps} />
+              </article>
+            )}
+            {panelConfig.todo && (
+              <article className="dashboard-panel card p-4">
+                <TodoPanel tasks={tasks} size="compact" onStatusChange={handleTaskStatusChange} />
+              </article>
+            )}
           </section>
         )}
       </main>

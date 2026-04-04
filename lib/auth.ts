@@ -1,6 +1,11 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { scrypt, randomBytes, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
+import { prisma } from "@/lib/prisma";
+
+const scryptAsync = promisify(scrypt);
 
 export type AuthRole = "MANAGER" | "OPERATOR";
 
@@ -38,23 +43,43 @@ const users: Array<AuthUser & { password: string }> = [
   },
 ];
 
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const hash = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${salt}:${hash.toString("hex")}`;
+}
+
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return false;
+  const hashBuffer = Buffer.from(hash, "hex");
+  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
+  return timingSafeEqual(hashBuffer, derived);
+}
+
 export async function loginWithCredentials(email: string, password: string) {
-  const user = users.find(
-    (candidate) =>
-      candidate.email.toLowerCase() === email.toLowerCase().trim() &&
-      candidate.password === password,
-  );
-  if (!user) {
-    return null;
-  }
-  const safeUser = {
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = users.find((u) => u.email.toLowerCase() === normalizedEmail);
+  if (!user) return null;
+
+  // Check DB override first
+  const override = await prisma.userPasswordOverride.findUnique({
+    where: { email: normalizedEmail },
+  }).catch(() => null);
+
+  const passwordValid = override
+    ? await verifyPassword(password, override.passwordHash)
+    : password === user.password;
+
+  if (!passwordValid) return null;
+
+  return {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
     agencyCode: user.agencyCode,
   };
-  return safeUser;
 }
 
 export async function createAccessToken(user: AuthUser) {

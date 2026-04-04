@@ -141,6 +141,12 @@ model Dispatch {
   updatedAt      DateTime       @updatedAt
 }
 
+model UserPasswordOverride {
+  email        String   @id
+  passwordHash String
+  updatedAt    DateTime @updatedAt
+}
+
 model EmployeeKpi {
   id           String   @id @default(cuid())
   userId       String
