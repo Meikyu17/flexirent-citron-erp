@@ -237,15 +237,19 @@ function menuActionsForBooking(booking: BookingItem): BookingMenuAction[] {
 export function ReservationsPanel({
   bookings,
   size = "full",
+  onDeleteBooking,
 }: {
   bookings: BookingItem[];
   size?: "full" | "compact";
+  onDeleteBooking?: (bookingId: string) => Promise<void>;
 }) {
   const [smsBooking, setSmsBooking] = useState<BookingItem | null>(null);
   const [search, setSearch] = useState("");
   const [agencyFilter, setAgencyFilter] = useState<AgencyBrand | null>(null);
   const [platformFilter, setPlatformFilter] = useState<Platform | null>(null);
   const [openMenuBookingId, setOpenMenuBookingId] = useState<string | null>(null);
+  const [confirmDeleteBookingId, setConfirmDeleteBookingId] = useState<string | null>(null);
+  const [deletingBookingId, setDeletingBookingId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const [validatedBookingIds, setValidatedBookingIds] = useState<Set<string>>(
     () => {
@@ -332,7 +336,20 @@ export function ReservationsPanel({
 
   const handleBookingMenuAction = (booking: BookingItem, action: BookingMenuAction) => {
     setOpenMenuBookingId(null);
-    console.info(`[reservations] action=${action.id} booking=${booking.id}`);
+    if (action.id === "delete") {
+      setConfirmDeleteBookingId(booking.id);
+    }
+  };
+
+  const handleConfirmDeleteBooking = async (booking: BookingItem) => {
+    if (!onDeleteBooking) return;
+    setDeletingBookingId(booking.id);
+    setConfirmDeleteBookingId(null);
+    try {
+      await onDeleteBooking(booking.id);
+    } finally {
+      setDeletingBookingId(null);
+    }
   };
 
   const handleValidateBooking = (bookingId: string) => {
@@ -346,6 +363,27 @@ export function ReservationsPanel({
   return (
     <>
       {smsBooking && <SmsModal booking={smsBooking} onClose={() => setSmsBooking(null)} />}
+
+      {confirmDeleteBookingId && (() => {
+        const b = bookings.find((x) => x.id === confirmDeleteBookingId);
+        if (!b) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="card p-5 max-w-sm w-full mx-4">
+              <p className="font-semibold mb-1">Supprimer la réservation ?</p>
+              <p className="text-sm text-muted mb-4">{b.client} · {b.car} · {b.date}</p>
+              <div className="flex gap-2">
+                <button type="button" className="nav-button-danger cursor-pointer flex-1" onClick={() => void handleConfirmDeleteBooking(b)}>
+                  Supprimer
+                </button>
+                <button type="button" className="vehicle-toggle cursor-pointer flex-1" onClick={() => setConfirmDeleteBookingId(null)}>
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         {size === "full" ? (

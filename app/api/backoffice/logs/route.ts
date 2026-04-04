@@ -112,6 +112,7 @@ const createLogSchema = z.object({
   notes: z.string().trim().max(500).default(""),
   pickupAddress: z.string().trim().max(300).nullable().optional(),
   returnAddress: z.string().trim().max(300).nullable().optional(),
+  customerId: z.string().min(1).nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -181,6 +182,7 @@ export async function POST(request: Request) {
 
   const pickupAddress = d.pickupAddress || null;
   const returnAddress = d.returnAddress || null;
+  const customerId = d.customerId || null;
 
   // Persist new addresses for future autocomplete
   await upsertSavedAddresses([pickupAddress, returnAddress]).catch(() => {});
@@ -198,6 +200,7 @@ export async function POST(request: Request) {
       notes: d.notes,
       pickupAddress,
       returnAddress,
+      customerId,
     });
     return Response.json({ ok: true, log: serializeLog(log) }, { status: 201 });
   } catch (error) {

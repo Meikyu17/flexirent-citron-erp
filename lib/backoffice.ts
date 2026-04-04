@@ -364,6 +364,7 @@ export async function createStatusLog(data: {
   notes: string;
   pickupAddress: string | null;
   returnAddress: string | null;
+  customerId?: string | null;
 }) {
   return prisma.$transaction(async (tx) => {
     const log = await tx.vehicleStatusLog.create({
@@ -379,6 +380,7 @@ export async function createStatusLog(data: {
         notes: data.notes || null,
         pickupAddress: data.pickupAddress || null,
         returnAddress: data.returnAddress || null,
+        customerId: data.customerId ?? null,
       },
       include: {
         vehicle: { select: { model: true, plateNumber: true } },

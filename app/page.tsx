@@ -404,6 +404,15 @@ export default function Home() {
     });
   };
 
+  const handleDeleteBackofficeBooking = async (bookingId: string) => {
+    // bookingId is "BO-{logId}"
+    const logId = bookingId.startsWith("BO-") ? bookingId.slice(3) : bookingId;
+    const res = await fetch(`/api/backoffice/logs/${logId}`, { method: "DELETE" });
+    const data = (await res.json()) as { ok: boolean; error?: string };
+    if (!res.ok || !data.ok) throw new Error(data.error ?? "Erreur de suppression");
+    setBackofficeBookings((prev) => prev.filter((b) => b.id !== bookingId));
+  };
+
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
@@ -563,7 +572,7 @@ export default function Home() {
 
             {panelConfig.reservations && (
               <article ref={desktopRightRef} className="dashboard-panel card panel-priority p-4">
-                <ReservationsPanel bookings={backofficeBookings} size="full" />
+                <ReservationsPanel bookings={backofficeBookings} size="full" onDeleteBooking={handleDeleteBackofficeBooking} />
               </article>
             )}
           </section>
@@ -615,7 +624,7 @@ export default function Home() {
             >
               {panelConfig.reservations && (
                 <article className="dashboard-panel card panel-priority p-4">
-                  <ReservationsPanel bookings={backofficeBookings} size="full" />
+                  <ReservationsPanel bookings={backofficeBookings} size="full" onDeleteBooking={handleDeleteBackofficeBooking} />
                 </article>
               )}
 
@@ -642,7 +651,7 @@ export default function Home() {
             )}
             {panelConfig.reservations && (
               <article className="dashboard-panel card panel-priority p-4">
-                <ReservationsPanel bookings={backofficeBookings} size="compact" />
+                <ReservationsPanel bookings={backofficeBookings} size="compact" onDeleteBooking={handleDeleteBackofficeBooking} />
               </article>
             )}
             {panelConfig.dispatch && (

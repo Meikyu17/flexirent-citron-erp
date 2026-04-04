@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -68,6 +68,7 @@ type LogForm = {
 };
 
 type SavedAddress = { id: string; label: string };
+type CustomerSuggestion = { id: string; firstName: string; lastName: string; phone: string | null; email: string | null };
 
 type AddVehicleForm = {
   model: string;
@@ -236,10 +237,14 @@ export default function BackofficePage() {
   });
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [deletingAddressId, setDeletingAddressId] = useState<string | null>(null);
+  const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const customerSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [logLoading, setLogLoading] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
   const [logSuccess, setLogSuccess] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const [confirmDeleteLogId, setConfirmDeleteLogId] = useState<string | null>(null);
   const [logDeleteError, setLogDeleteError] = useState<string | null>(null);
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [editReservationForm, setEditReservationForm] = useState<EditReservationForm>({
@@ -550,6 +555,7 @@ export default function BackofficePage() {
         status: effectiveStatus,
         startsAt: logForm.startsAt ? new Date(logForm.startsAt).toISOString() : null,
         endsAt: logForm.endsAt ? new Date(logForm.endsAt).toISOString() : null,
+        customerId: selectedCustomerId ?? null,
       };
       const res = await fetch("/api/backoffice/logs", {
         method: "POST",
@@ -577,6 +583,8 @@ export default function BackofficePage() {
         pickupAddress: "",
         returnAddress: "",
       }));
+      setSelectedCustomerId(null);
+      setCustomerSuggestions([]);
       setLogSuccess(true);
       setTimeout(() => setLogSuccess(false), 3000);
     } catch (err) {
@@ -787,6 +795,12 @@ export default function BackofficePage() {
             >
               {theme === "light" ? "☽" : "☀"}
             </button>
+            <Link href="/clients" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
+              Clients
+            </Link>
+            <Link href="/pricing" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
+              Tarifs
+            </Link>
             <Link href="/" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
               Dashboard
             </Link>
@@ -1407,15 +1421,58 @@ export default function BackofficePage() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>
                     Client
+                    {selectedCustomerId && (
+                      <span className="ml-2 chip text-xs">Lié au carnet</span>
+                    )}
                   </label>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      type="text"
-                      placeholder="Nom du client"
-                      value={logForm.customerName}
-                      onChange={(e) => setLogForm((f) => ({ ...f, customerName: e.target.value }))}
-                      style={{ ...inputStyle, flex: 1 }}
-                    />
+                    <div className="flex flex-col gap-1" style={{ flex: 1 }}>
+                      <input
+                        type="text"
+                        placeholder="Nom du client"
+                        value={logForm.customerName}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLogForm((f) => ({ ...f, customerName: val }));
+                          setSelectedCustomerId(null);
+                          if (customerSearchTimeout.current) clearTimeout(customerSearchTimeout.current);
+                          if (val.trim().length >= 2) {
+                            customerSearchTimeout.current = setTimeout(() => {
+                              fetch(`/api/clients?q=${encodeURIComponent(val.trim())}`, { cache: "no-store" })
+                                .then((r) => r.json() as Promise<{ ok: boolean; customers?: CustomerSuggestion[] }>)
+                                .then((d) => { if (d.ok && d.customers) setCustomerSuggestions(d.customers.slice(0, 6)); })
+                                .catch(() => {});
+                            }, 250);
+                          } else {
+                            setCustomerSuggestions([]);
+                          }
+                        }}
+                        style={{ ...inputStyle }}
+                      />
+                      {customerSuggestions.length > 0 && (
+                        <div className="card p-1 flex flex-col gap-0.5" style={{ zIndex: 10 }}>
+                          {customerSuggestions.map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              className="vehicle-toggle cursor-pointer text-left text-sm px-2 py-1"
+                              onClick={() => {
+                                setLogForm((f) => ({
+                                  ...f,
+                                  customerName: `${s.firstName} ${s.lastName}`,
+                                  customerPhone: s.phone ?? f.customerPhone,
+                                }));
+                                setSelectedCustomerId(s.id);
+                                setCustomerSuggestions([]);
+                              }}
+                            >
+                              {s.firstName} {s.lastName}
+                              {s.phone && <span className="text-muted ml-2">{s.phone}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <input
                       type="tel"
                       placeholder="Téléphone"
@@ -1739,14 +1796,33 @@ export default function BackofficePage() {
                               >
                                 Modifier réservation
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteReservationLog(log.id)}
-                                disabled={deletingLogId === log.id}
-                                className="nav-button-danger cursor-pointer flex-1"
-                              >
-                                {deletingLogId === log.id ? "Suppression…" : "Supprimer réservation"}
-                              </button>
+                              {confirmDeleteLogId === log.id ? (
+                                <div className="flex flex-1 gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => { void handleDeleteReservationLog(log.id); setConfirmDeleteLogId(null); }}
+                                    disabled={deletingLogId === log.id}
+                                    className="nav-button-danger cursor-pointer flex-1"
+                                  >
+                                    {deletingLogId === log.id ? "Suppression…" : "Confirmer"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteLogId(null)}
+                                    className="vehicle-toggle cursor-pointer flex-1"
+                                  >
+                                    Annuler
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteLogId(log.id)}
+                                  className="nav-button-danger cursor-pointer flex-1"
+                                >
+                                  Supprimer réservation
+                                </button>
+                              )}
                             </div>
                           )}
                         </>
