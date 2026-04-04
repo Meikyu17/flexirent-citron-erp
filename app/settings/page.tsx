@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 type Theme = "light" | "dark" | "ocean" | "ocean-dark" | "forest" | "midnight" | "sunset";
 
@@ -39,7 +38,6 @@ function loadPanelConfig(): PanelConfig[] {
     if (!raw) return defaultPanelConfig();
     const parsed = JSON.parse(raw) as PanelConfig[];
     // Ensure all panels are present
-    const ids = parsed.map((p) => p.id);
     const merged = ALL_PANELS.map((p) => {
       const saved = parsed.find((s) => s.id === p.id);
       return saved ?? { id: p.id, visible: true };
@@ -51,8 +49,6 @@ function loadPanelConfig(): PanelConfig[] {
 }
 
 export default function SettingsPage() {
-  const router = useRouter();
-
   // — Theme —
   const [theme, setTheme] = useState<Theme>("light");
 
@@ -151,7 +147,7 @@ export default function SettingsPage() {
         <section className="card p-5 flex flex-col gap-4">
           <div>
             <h2 className="text-lg font-semibold">Apparence</h2>
-            <p className="mt-0.5 text-sm text-muted">Choisissez le thème de l'interface</p>
+            <p className="mt-0.5 text-sm text-muted">Choisissez le thème de l&apos;interface</p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {THEMES.map((t) => {
@@ -197,11 +193,11 @@ export default function SettingsPage() {
               return (
                 <div
                   key={p.id}
-                  className="card bg-card-secondary p-3 flex items-center gap-3"
+                  className="card bg-card-secondary flex flex-col gap-3 p-3 sm:flex-row sm:items-center"
                   style={{ opacity: p.visible ? 1 : 0.5 }}
                 >
                   {/* Order controls */}
-                  <div className="flex flex-col gap-0.5 shrink-0">
+                  <div className="flex shrink-0 flex-row gap-1 sm:flex-col sm:gap-0.5">
                     <button
                       type="button"
                       onClick={() => movePanel(i, -1)}
@@ -228,7 +224,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => togglePanel(p.id)}
-                    className="vehicle-toggle cursor-pointer shrink-0"
+                    className="vehicle-toggle cursor-pointer w-full shrink-0 sm:w-auto"
                     style={{ fontSize: "0.75rem", padding: "3px 10px" }}
                   >
                     {p.visible ? "Masquer" : "Afficher"}
@@ -248,7 +244,7 @@ export default function SettingsPage() {
             <h2 className="text-lg font-semibold">Changer le mot de passe</h2>
             <p className="mt-0.5 text-sm text-muted">Le nouveau mot de passe sera enregistré en base de données</p>
           </div>
-          <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-3" style={{ maxWidth: 420 }}>
+          <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-3" style={{ maxWidth: 420, width: "100%" }}>
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium" htmlFor="pw-current">Mot de passe actuel</label>
               <input
@@ -320,11 +316,11 @@ export default function SettingsPage() {
               <p style={{ fontSize: "0.82rem", color: "var(--success)" }}>Mot de passe modifié avec succès.</p>
             )}
 
-            <div>
+            <div className="w-full">
               <button
                 type="submit"
                 disabled={pwLoading}
-                className="vehicle-toggle cursor-pointer"
+                className="vehicle-toggle cursor-pointer w-full sm:w-auto"
                 style={{ padding: "0.5rem 1.25rem" }}
               >
                 {pwLoading ? "Enregistrement..." : "Enregistrer"}

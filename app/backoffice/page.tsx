@@ -728,7 +728,7 @@ export default function BackofficePage() {
       <div className="mx-auto w-full max-w-2xl flex flex-col gap-6">
 
         {/* Header */}
-        <header className="flex items-center justify-between gap-3">
+        <header className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div>
             <p className="text-xs font-medium uppercase tracking-widest text-muted">
               Citron ERP
@@ -737,7 +737,7 @@ export default function BackofficePage() {
               Backoffice flotte
             </h1>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
             <button
               type="button"
               className="vehicle-toggle cursor-pointer"
@@ -772,9 +772,9 @@ export default function BackofficePage() {
           <>
             {/* ── Section 0 : Équipe ── */}
             <section className="flex flex-col gap-4" style={{ order: 1 }}>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
                 <h2 className="text-base font-semibold">Équipe</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                   <button type="button" className="vehicle-toggle cursor-pointer" onClick={() => setIsTeamCollapsed((v) => !v)}>
                     {isTeamCollapsed ? "Déplier" : "Replier"}
                   </button>
@@ -818,7 +818,7 @@ export default function BackofficePage() {
                   {memberSaveError && <p className="text-xs" style={{ color: "var(--danger)" }}>{memberSaveError}</p>}
 
                   {teamMembers.length === 0 && !showAddMember && (
-                    <p className="text-sm text-center py-4" style={{ color: "var(--muted)" }}>Aucun membre dans l'équipe.</p>
+                    <p className="text-sm text-center py-4" style={{ color: "var(--muted)" }}>Aucun membre dans l&apos;équipe.</p>
                   )}
 
                   <div className="flex flex-col gap-2">
@@ -827,7 +827,7 @@ export default function BackofficePage() {
                       const draft = memberDrafts[member.id] ?? { name: member.name, email: member.email ?? "" };
                       return (
                         <div key={member.id} className="card p-4 flex flex-col gap-3">
-                          <div className="flex items-center justify-between gap-2">
+                          <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <p className="font-medium text-sm">{member.name}</p>
@@ -847,10 +847,10 @@ export default function BackofficePage() {
                               </div>
                               {member.email && <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{member.email}</p>}
                             </div>
-                            <div className="flex gap-1.5 shrink-0">
+                            <div className="flex w-full flex-wrap gap-1.5 sm:w-auto sm:shrink-0">
                               <button
                                 type="button"
-                                className={`vehicle-toggle cursor-pointer ${member.isAvailableForDispatch ? "vehicle-toggle-active" : ""}`}
+                                className={`vehicle-toggle cursor-pointer flex-1 sm:flex-none ${member.isAvailableForDispatch ? "vehicle-toggle-active" : ""}`}
                                 onClick={() => handleToggleMemberAvailability(member)}
                                 title={member.isAvailableForDispatch ? "Désactiver du dispatch" : "Activer pour le dispatch"}
                               >
@@ -858,7 +858,7 @@ export default function BackofficePage() {
                               </button>
                               <button
                                 type="button"
-                                className={`vehicle-toggle cursor-pointer ${isEditing ? "vehicle-toggle-active" : ""}`}
+                                className={`vehicle-toggle cursor-pointer flex-1 sm:flex-none ${isEditing ? "vehicle-toggle-active" : ""}`}
                                 onClick={() => {
                                   setEditingMemberId(isEditing ? null : member.id);
                                   setMemberSaveError(null);
@@ -871,16 +871,16 @@ export default function BackofficePage() {
                                 <>
                                   <button
                                     type="button"
-                                    className="nav-button-danger cursor-pointer"
+                                    className="nav-button-danger cursor-pointer flex-1 sm:flex-none"
                                     disabled={deletingMemberId === member.id}
                                     onClick={() => handleDeleteMember(member.id)}
                                   >
                                     {deletingMemberId === member.id ? "…" : "Confirmer"}
                                   </button>
-                                  <button type="button" className="vehicle-toggle cursor-pointer" onClick={() => setConfirmDeleteMemberId(null)}>✕</button>
+                                  <button type="button" className="vehicle-toggle cursor-pointer sm:flex-none" onClick={() => setConfirmDeleteMemberId(null)}>✕</button>
                                 </>
                               ) : (
-                                <button type="button" className="nav-button-danger cursor-pointer" onClick={() => setConfirmDeleteMemberId(member.id)}>
+                                <button type="button" className="nav-button-danger cursor-pointer flex-1 sm:flex-none" onClick={() => setConfirmDeleteMemberId(member.id)}>
                                   Supprimer
                                 </button>
                               )}
@@ -922,9 +922,9 @@ export default function BackofficePage() {
 
             {/* ── Section 1 : Flotte ── */}
             <section className="flex flex-col gap-4" style={{ order: 2 }}>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
                 <h2 className="text-base font-semibold">Flotte de vehicules</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                   <button
                     type="button"
                     className="vehicle-toggle cursor-pointer"
@@ -980,7 +980,7 @@ export default function BackofficePage() {
                       required
                     />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <div className="flex flex-col gap-2 flex-1">
                       <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>
                         Zone parking
@@ -1007,7 +1007,7 @@ export default function BackofficePage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
                       <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>
                         Agence
                       </label>
@@ -1052,7 +1052,7 @@ export default function BackofficePage() {
                           style={inputStyle}
                           required
                         />
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row">
                           <input
                             type="text"
                             placeholder="Code unique (ex : CTR-75)"
@@ -1137,11 +1137,11 @@ export default function BackofficePage() {
                   return (
                     <div key={vehicle.id} className="card p-4 flex flex-col gap-3">
                       {/* Header */}
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
                         <button
                           type="button"
                           onClick={toggleCollapse}
-                          className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer"
+                          className="flex w-full items-center gap-2 flex-1 min-w-0 text-left cursor-pointer"
                           style={{ background: "none", border: "none", padding: 0 }}
                         >
                           <span
@@ -1172,7 +1172,7 @@ export default function BackofficePage() {
                           </div>
                         </button>
                         <span
-                          className="chip shrink-0"
+                          className="chip shrink-0 self-start sm:self-auto"
                           style={{ fontSize: "0.75rem", borderColor: "transparent", background: "color-mix(in srgb, " + statusColor(vehicle.operationalStatus) + " 12%, var(--card-secondary))", color: statusColor(vehicle.operationalStatus) }}
                         >
                           {vehicle.plateNumber}
@@ -1189,7 +1189,7 @@ export default function BackofficePage() {
                         />
                       </div>}
 
-                      {!collapsed && <div className="flex gap-2">
+                      {!collapsed && <div className="flex flex-col gap-2 sm:flex-row">
                         <div className="flex flex-col gap-1 flex-1">
                           <label className="text-xs" style={{ color: "var(--muted)" }}>Zone</label>
                           <input
@@ -1262,7 +1262,7 @@ export default function BackofficePage() {
 
                         {/* Delete */}
                         {confirmDeleteId === vehicle.id ? (
-                          <div className="flex gap-2">
+                          <div className="flex flex-col gap-2 sm:flex-row">
                             <button
                               type="button"
                               onClick={() => handleDeleteVehicle(vehicle.id)}
@@ -1331,7 +1331,7 @@ export default function BackofficePage() {
                   <p className="text-xs" style={{ color: "var(--muted)" }}>
                     Le statut réservation est automatique (Réservé / En location). Seul Hors service est manuel.
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
                     <span
                       className="chip shrink-0"
                       style={{
@@ -1371,7 +1371,7 @@ export default function BackofficePage() {
                   <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>
                     Client
                   </label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <input
                       type="text"
                       placeholder="Nom du client"
@@ -1390,7 +1390,7 @@ export default function BackofficePage() {
                 </div>
 
                 {/* Dates */}
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="flex flex-col gap-1.5 flex-1">
                     <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>
                       Début
@@ -1420,7 +1420,7 @@ export default function BackofficePage() {
                   <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>
                     Agence
                   </label>
-                  <div className="flex gap-1.5">
+                  <div className="flex flex-col gap-1.5 sm:flex-row">
                     {BRAND_OPTIONS.map((opt) => (
                       <button
                         key={opt.value}
@@ -1494,7 +1494,7 @@ export default function BackofficePage() {
             {/* ── Section 3 : Historique ── */}
             {logs.length > 0 && (
               <section className="flex flex-col gap-3" style={{ order: 3 }}>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
                   <h2 className="text-base font-semibold">Historique récent</h2>
                   <button
                     type="button"
@@ -1513,7 +1513,7 @@ export default function BackofficePage() {
                 <div className="flex flex-col gap-2">
                   {logs.map((log) => (
                     <div key={log.id} className="card p-3 flex flex-col gap-1">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
                         <p className="text-sm font-medium">
                           {log.vehicle.model}
                           <span className="ml-1.5 text-xs font-normal" style={{ color: "var(--muted)" }}>
@@ -1563,7 +1563,7 @@ export default function BackofficePage() {
                                 </select>
                               </div>
 
-                              <div className="flex gap-2">
+                              <div className="flex flex-col gap-2 sm:flex-row">
                                 <div className="flex flex-col gap-1 flex-1">
                                   <label className="text-xs" style={{ color: "var(--muted)" }}>
                                     Début
@@ -1604,7 +1604,7 @@ export default function BackofficePage() {
                                 </p>
                               )}
 
-                              <div className="flex gap-2">
+                              <div className="flex flex-col gap-2 sm:flex-row">
                                 <button
                                   type="button"
                                   className="vehicle-toggle cursor-pointer flex-1"
@@ -1623,7 +1623,7 @@ export default function BackofficePage() {
                               </div>
                             </div>
                           ) : (
-                            <div className="mt-2 flex gap-2">
+                            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                               <button
                                 type="button"
                                 onClick={() => startEditingReservation(log)}
@@ -1680,8 +1680,6 @@ const primaryButtonStyle: React.CSSProperties = {
   width: "100%",
   opacity: 1,
 };
-
-
 
 
 

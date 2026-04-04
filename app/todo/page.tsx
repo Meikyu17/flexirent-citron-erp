@@ -259,12 +259,12 @@ export default function TodoPage() {
       <div className="mx-auto w-full max-w-2xl flex flex-col gap-6">
 
         {/* Header */}
-        <header className="flex items-center justify-between gap-3">
+        <header className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div>
             <p className="text-xs font-medium uppercase tracking-widest text-muted">Citron ERP</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">Tâches</h1>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
             <button
               type="button"
               className="vehicle-toggle cursor-pointer"
@@ -288,8 +288,8 @@ export default function TodoPage() {
         {!loading && (
           <>
             {/* Stats + actions */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex gap-2 flex-wrap">
+            <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+              <div className="flex flex-wrap gap-2">
                 {(["ALL", "TODO", "IN_PROGRESS", "DONE"] as const).map((s) => (
                   <button
                     key={s}
@@ -303,7 +303,7 @@ export default function TodoPage() {
               </div>
               <button
                 type="button"
-                className={`vehicle-toggle cursor-pointer ${showForm && !editingId ? "vehicle-toggle-active" : ""}`}
+                className={`vehicle-toggle cursor-pointer w-full sm:w-auto ${showForm && !editingId ? "vehicle-toggle-active" : ""}`}
                 onClick={() => showForm && !editingId ? setShowForm(false) : openCreate()}
               >
                 {showForm && !editingId ? "Annuler" : "+ Nouvelle tâche"}
@@ -326,7 +326,7 @@ export default function TodoPage() {
                   required
                 />
 
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="flex flex-col gap-1 flex-1">
                     <label className="text-xs" style={{ color: "var(--muted)" }}>Date & heure</label>
                     <input
@@ -336,7 +336,7 @@ export default function TodoPage() {
                       style={inputStyle}
                     />
                   </div>
-                  <div className="flex flex-col gap-1" style={{ width: "120px" }}>
+                  <div className="flex flex-col gap-1">
                     <label className="text-xs" style={{ color: "var(--muted)" }}>Durée (min)</label>
                     <input
                       type="number"
@@ -357,7 +357,7 @@ export default function TodoPage() {
                   style={inputStyle}
                 />
 
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="flex flex-col gap-1 flex-1">
                     <label className="text-xs" style={{ color: "var(--muted)" }}>Assigné à</label>
                     <select
@@ -389,7 +389,7 @@ export default function TodoPage() {
                 {editingId && (
                   <div className="flex flex-col gap-1">
                     <label className="text-xs" style={{ color: "var(--muted)" }}>Statut</label>
-                    <div className="flex gap-1.5">
+                    <div className="flex flex-wrap gap-1.5">
                       {STATUS_OPTIONS.map((opt) => (
                         <button
                           key={opt.value}
@@ -414,7 +414,7 @@ export default function TodoPage() {
 
                 {formError && <p className="text-xs" style={{ color: "var(--danger)" }}>{formError}</p>}
 
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   {editingId && (
                     <button
                       type="button"
@@ -499,10 +499,10 @@ export default function TodoPage() {
                         {opt.label}
                       </button>
                     ))}
-                    <div className="flex gap-1.5 ml-auto">
+                    <div className="flex w-full flex-wrap gap-1.5 sm:ml-auto sm:w-auto">
                       <button
                         type="button"
-                        className="vehicle-toggle cursor-pointer"
+                        className="vehicle-toggle cursor-pointer flex-1 sm:flex-none"
                         style={{ fontSize: "0.75rem", padding: "2px 10px" }}
                         onClick={() => openEdit(task)}
                       >
@@ -512,7 +512,7 @@ export default function TodoPage() {
                         <>
                           <button
                             type="button"
-                            className="nav-button-danger cursor-pointer"
+                            className="nav-button-danger cursor-pointer flex-1 sm:flex-none"
                             style={{ fontSize: "0.75rem" }}
                             disabled={deletingId === task.id}
                             onClick={() => handleDelete(task.id)}
@@ -521,18 +521,18 @@ export default function TodoPage() {
                           </button>
                           <button
                             type="button"
-                            className="vehicle-toggle cursor-pointer"
+                            className="vehicle-toggle cursor-pointer sm:flex-none"
                             style={{ fontSize: "0.75rem", padding: "2px 8px" }}
                             onClick={() => setConfirmDeleteId(null)}
                           >✕</button>
                         </>
                       ) : (
-                        <button
-                          type="button"
-                          className="nav-button-danger cursor-pointer"
-                          style={{ fontSize: "0.75rem" }}
-                          onClick={() => setConfirmDeleteId(task.id)}
-                        >
+                          <button
+                            type="button"
+                            className="nav-button-danger cursor-pointer flex-1 sm:flex-none"
+                            style={{ fontSize: "0.75rem" }}
+                            onClick={() => setConfirmDeleteId(task.id)}
+                          >
                           Supprimer
                         </button>
                       )}
