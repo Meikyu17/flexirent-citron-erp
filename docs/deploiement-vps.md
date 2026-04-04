@@ -10,6 +10,118 @@ Ce guide est prevu pour un VPS sur lequel d'autres sites tournent deja.
 - La base PostgreSQL reste privee dans Docker.
 - Le flux iCal fonctionnera si l'app est servie en HTTPS avec le bon sous-domaine public et que le proxy transmet bien `Host` et `X-Forwarded-Proto`.
 
+## Cas `citronlocation.fr` avec deux serveurs
+
+Configuration que tu m'as donnee:
+
+- le site vitrine `citronlocation.fr` reste sur le serveur A
+- l'admin ERP tourne sur le serveur B
+- tu voudrais exposer l'admin sur `citronlocation.fr/admin`
+- le domaine est gere chez Hostinger
+
+Point important:
+
+- Hostinger peut gerer le DNS du domaine
+- le DNS sait envoyer un domaine ou un sous-domaine vers une IP
+- le DNS ne sait pas router un chemin comme `/admin`
+
+Donc:
+
+- `citronlocation.fr` peut pointer vers le serveur A
+- `admin.citronlocation.fr` peut pointer vers le serveur B
+- mais `citronlocation.fr/admin` ne peut pas etre "pointe" directement vers le serveur B depuis Hostinger
+
+Si tu veux absolument `citronlocation.fr/admin`, il faut que le serveur A joue le role de proxy inverse et transmette tout le trafic `/admin` vers le serveur B.
+
+## Recommandation retenue
+
+Pour ton cas, la solution a retenir est:
+
+1. `citronlocation.fr` reste sur le serveur A pour le site vitrine
+2. `admin.citronlocation.fr` pointe vers le serveur B pour l'ERP
+3. l'iCal utilise `https://admin.citronlocation.fr/api/dispatch/ical?token=...`
+
+Pourquoi je te recommande ce schema:
+
+- pas de proxy inter-serveurs complexe entre A et B
+- pas de conflit entre le site vitrine et l'admin
+- configuration DNS simple chez Hostinger
+- configuration Next.js plus simple
+- iCal plus stable pour Google Agenda
+
+## Si tu tiens a `citronlocation.fr/admin`
+
+Cette option est possible, mais elle impose deux contraintes techniques:
+
+1. le serveur A doit proxyfier `/admin` vers le serveur B
+2. l'application Next doit etre adaptee pour fonctionner sous un sous-chemin `/admin`
+
+Aujourd'hui, cette application n'est pas encore prete pour un hebergement sous `/admin` tel quel:
+
+- elle utilise beaucoup de routes absolues comme `/login`, `/api/auth/login`, `/settings`, `/todo`
+- elle n'a pas de `basePath` configure dans `next.config.ts`
+- le middleware d'auth et plusieurs redirections supposent que l'app est montee a la racine `/`
+
+En clair:
+
+- `citronlocation.fr/admin` n'est pas juste une regle DNS
+- c'est un vrai chantier d'integration entre le serveur A et l'application Next.js
+
+## Architecture retenue pour ton cas
+
+### Sous-domaine admin
+
+- Hostinger DNS:
+  - `A` record `@` -> IP du serveur A
+  - `A` record `admin` -> IP du serveur B
+- Serveur A:
+  - heberge uniquement le site vitrine `citronlocation.fr`
+- Serveur B:
+  - heberge l'ERP sur `admin.citronlocation.fr`
+  - deploie l'app avec `docker-compose.vps.yml`
+  - reverse proxy local vers `127.0.0.1:3002`
+
+### Option alternative plus lourde: chemin `/admin`
+
+- Hostinger DNS:
+  - `A` record `@` -> IP du serveur A
+- Serveur A:
+  - sert `citronlocation.fr`
+  - proxy `/admin` vers le serveur B
+- Serveur B:
+  - recoit le trafic de l'ERP
+  - l'app doit etre rebuild avec `basePath: "/admin"` et les routes doivent etre verifiees
+
+## Consequence sur l'iCal
+
+Le flux iCal public est genere a partir du domaine de la requete.
+
+Donc:
+
+- si tu utilises `admin.citronlocation.fr`, l'URL iCal sera de type `https://admin.citronlocation.fr/api/dispatch/ical?token=...`
+- si tu utilises `citronlocation.fr/admin`, il faudra que l'app soit completement compatible `basePath=/admin`, sinon les URLs generees et certains appels client risquent d'etre faux
+
+Pour Google Agenda, la version sous-domaine est la plus fiable.
+
+## Checklist Hostinger
+
+Dans Hostinger, zone DNS de `citronlocation.fr`:
+
+1. laisse `@` pointer vers l'IP du serveur A
+2. ajoute `admin` en type `A` vers l'IP publique du serveur B
+3. attends la propagation DNS
+4. verifie:
+
+```bash
+dig +short citronlocation.fr
+dig +short admin.citronlocation.fr
+```
+
+Tu dois obtenir:
+
+- `citronlocation.fr` -> IP du serveur A
+- `admin.citronlocation.fr` -> IP du serveur B
+
 ## Architecture recommandee
 
 Choisis un sous-domaine dedie, par exemple `erp.tondomaine.fr`.
