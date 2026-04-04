@@ -171,6 +171,23 @@ export async function listAgencies() {
   });
 }
 
+export async function createAgency(data: {
+  name: string;
+  code: string;
+  city: string;
+  brand: AgencyBrand;
+}) {
+  return prisma.agency.create({
+    data: {
+      name: data.name,
+      code: data.code,
+      city: data.city,
+      brand: data.brand,
+    },
+    select: { id: true, code: true, name: true, brand: true },
+  });
+}
+
 export async function listBackofficeVehicles() {
   const now = new Date();
   return prisma.vehicle.findMany({

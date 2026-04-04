@@ -82,6 +82,7 @@ model Vehicle {
   agency            Agency                   @relation(fields: [agencyId], references: [id])
   reservations      Reservation[]
   statusLogs        VehicleStatusLog[]
+  tasks             Task[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 }
@@ -197,15 +198,39 @@ model ParkingOption {
   @@unique([kind, value])
 }
 
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model Task {
+  id              String                @id @default(cuid())
+  title           String
+  scheduledAt     DateTime?
+  durationMinutes Int?
+  notes           String?
+  location        String?
+  status          TaskStatus            @default(TODO)
+  assignedToId    String?
+  assignedTo      DispatchIcalEmployee? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  vehicleId       String?
+  vehicle         Vehicle?              @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+}
+
 model DispatchIcalEmployee {
-  id        String             @id @default(cuid())
-  name      String             @unique
-  slug      String             @unique
-  token     String             @unique
-  email     String?
-  events    DispatchIcalEvent[]
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id                     String              @id @default(cuid())
+  name                   String              @unique
+  slug                   String              @unique
+  token                  String              @unique
+  email                  String?
+  isAvailableForDispatch Boolean             @default(true)
+  events                 DispatchIcalEvent[]
+  tasks                  Task[]
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 }
 
 model DispatchIcalEvent {

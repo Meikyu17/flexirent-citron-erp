@@ -73,10 +73,25 @@ type AddVehicleForm = {
   agencyId: string;
 };
 
+type AddAgencyForm = {
+  name: string;
+  code: string;
+  city: string;
+  brand: AgencyBrand;
+};
+
 type EditReservationForm = {
   vehicleId: string;
   startsAt: string;
   endsAt: string;
+};
+
+type TeamMember = {
+  id: string;
+  name: string;
+  email: string | null;
+  isAvailableForDispatch: boolean;
+  updatedAt: string;
 };
 
 const STATUS_OPTIONS: { value: OperationalStatus; label: string }[] = [
@@ -183,6 +198,16 @@ export default function BackofficePage() {
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
+  const [showAddAgency, setShowAddAgency] = useState(false);
+  const [addAgencyForm, setAddAgencyForm] = useState<AddAgencyForm>({
+    name: "",
+    code: "",
+    city: "",
+    brand: "CITRON_LOCATION",
+  });
+  const [addAgencyLoading, setAddAgencyLoading] = useState(false);
+  const [addAgencyError, setAddAgencyError] = useState<string | null>(null);
+
   const [logForm, setLogForm] = useState<LogForm>({
     vehicleId: "",
     status: "AVAILABLE",
@@ -208,6 +233,19 @@ export default function BackofficePage() {
   const [editLoadingId, setEditLoadingId] = useState<string | null>(null);
   const [editLogError, setEditLogError] = useState<string | null>(null);
 
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [isTeamCollapsed, setIsTeamCollapsed] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [addMemberForm, setAddMemberForm] = useState({ name: "", email: "" });
+  const [addMemberLoading, setAddMemberLoading] = useState(false);
+  const [addMemberError, setAddMemberError] = useState<string | null>(null);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [memberDrafts, setMemberDrafts] = useState<Record<string, { name: string; email: string }>>({});
+  const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
+  const [memberSaveError, setMemberSaveError] = useState<string | null>(null);
+  const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
+  const [confirmDeleteMemberId, setConfirmDeleteMemberId] = useState<string | null>(null);
+
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   // Theme sync
@@ -226,10 +264,11 @@ export default function BackofficePage() {
       setLoading(true);
       setError(null);
       try {
-        const [vRes, aRes, lRes] = await Promise.all([
+        const [vRes, aRes, lRes, tRes] = await Promise.all([
           fetch("/api/backoffice/vehicles", { cache: "no-store" }),
           fetch("/api/backoffice/agencies", { cache: "no-store" }),
           fetch("/api/backoffice/logs", { cache: "no-store" }),
+          fetch("/api/backoffice/team", { cache: "no-store" }),
         ]);
 
         if (vRes.status === 401 || aRes.status === 401) {
@@ -237,10 +276,11 @@ export default function BackofficePage() {
           return;
         }
 
-        const [vData, aData, lData] = await Promise.all([
+        const [vData, aData, lData, tData] = await Promise.all([
           vRes.json() as Promise<{ ok: boolean; vehicles?: BackofficeVehicle[]; error?: string }>,
           aRes.json() as Promise<{ ok: boolean; agencies?: BackofficeAgency[] }>,
           lRes.json() as Promise<{ ok: boolean; logs?: StatusLog[] }>,
+          tRes.json() as Promise<{ ok: boolean; members?: TeamMember[] }>,
         ]);
 
         if (cancelled) return;
@@ -272,6 +312,10 @@ export default function BackofficePage() {
           }
         }
         if (lData.ok && lData.logs) setLogs(lData.logs);
+        if (tData.ok && tData.members) {
+          setTeamMembers(tData.members);
+          setMemberDrafts(Object.fromEntries(tData.members.map((m) => [m.id, { name: m.name, email: m.email ?? "" }])));
+        }
       } catch (err) {
         if (!cancelled)
           setError(err instanceof Error ? err.message : "Erreur de chargement");
@@ -419,6 +463,34 @@ export default function BackofficePage() {
     }
   };
 
+  const handleAddAgency = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addAgencyForm.name.trim() || !addAgencyForm.code.trim() || !addAgencyForm.city.trim()) {
+      setAddAgencyError("Nom, code et ville sont requis.");
+      return;
+    }
+    setAddAgencyLoading(true);
+    setAddAgencyError(null);
+    try {
+      const res = await fetch("/api/backoffice/agencies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(addAgencyForm),
+      });
+      const data = (await res.json()) as { ok: boolean; agency?: BackofficeAgency; error?: string };
+      if (!res.ok || !data.ok || !data.agency) throw new Error(data.error ?? "Erreur création agence");
+      const newAgency = data.agency;
+      setAgencies((prev) => [...prev, newAgency].sort((a, b) => a.name.localeCompare(b.name)));
+      setAddForm((f) => ({ ...f, agencyId: newAgency.id }));
+      setAddAgencyForm({ name: "", code: "", city: "", brand: "CITRON_LOCATION" });
+      setShowAddAgency(false);
+    } catch (err) {
+      setAddAgencyError(err instanceof Error ? err.message : "Erreur création agence");
+    } finally {
+      setAddAgencyLoading(false);
+    }
+  };
+
   const handleSubmitLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!logForm.vehicleId) {
@@ -555,6 +627,84 @@ export default function BackofficePage() {
     }
   };
 
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addMemberForm.name.trim()) { setAddMemberError("Le nom est requis."); return; }
+    setAddMemberLoading(true);
+    setAddMemberError(null);
+    try {
+      const res = await fetch("/api/backoffice/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(addMemberForm),
+      });
+      const data = (await res.json()) as { ok: boolean; member?: TeamMember; error?: string };
+      if (!res.ok || !data.ok || !data.member) throw new Error(data.error ?? "Erreur création");
+      setTeamMembers((prev) => [...prev, data.member!].sort((a, b) => a.name.localeCompare(b.name)));
+      setMemberDrafts((prev) => ({ ...prev, [data.member!.id]: { name: data.member!.name, email: data.member!.email ?? "" } }));
+      setAddMemberForm({ name: "", email: "" });
+      setShowAddMember(false);
+    } catch (err) {
+      setAddMemberError(err instanceof Error ? err.message : "Erreur création");
+    } finally {
+      setAddMemberLoading(false);
+    }
+  };
+
+  const handleSaveMember = async (memberId: string) => {
+    const draft = memberDrafts[memberId];
+    if (!draft?.name.trim()) { setMemberSaveError("Le nom est requis."); return; }
+    setSavingMemberId(memberId);
+    setMemberSaveError(null);
+    try {
+      const res = await fetch(`/api/backoffice/team/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      const data = (await res.json()) as { ok: boolean; member?: TeamMember; error?: string };
+      if (!res.ok || !data.ok || !data.member) throw new Error(data.error ?? "Erreur modification");
+      setTeamMembers((prev) => prev.map((m) => m.id === memberId ? data.member! : m).sort((a, b) => a.name.localeCompare(b.name)));
+      setEditingMemberId(null);
+    } catch (err) {
+      setMemberSaveError(err instanceof Error ? err.message : "Erreur modification");
+    } finally {
+      setSavingMemberId(null);
+    }
+  };
+
+  const handleToggleMemberAvailability = async (member: TeamMember) => {
+    const next = !member.isAvailableForDispatch;
+    setTeamMembers((prev) => prev.map((m) => m.id === member.id ? { ...m, isAvailableForDispatch: next } : m));
+    try {
+      const draft = memberDrafts[member.id] ?? { name: member.name, email: member.email ?? "" };
+      await fetch(`/api/backoffice/team/${member.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...draft, isAvailableForDispatch: next }),
+      });
+    } catch {
+      setTeamMembers((prev) => prev.map((m) => m.id === member.id ? { ...m, isAvailableForDispatch: !next } : m));
+    }
+  };
+
+  const handleDeleteMember = async (memberId: string) => {
+    setDeletingMemberId(memberId);
+    setMemberSaveError(null);
+    try {
+      const res = await fetch(`/api/backoffice/team/${memberId}`, { method: "DELETE" });
+      const data = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Erreur suppression");
+      setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
+      setConfirmDeleteMemberId(null);
+    } catch (err) {
+      setMemberSaveError(err instanceof Error ? err.message : "Erreur suppression");
+      setConfirmDeleteMemberId(null);
+    } finally {
+      setDeletingMemberId(null);
+    }
+  };
+
   const selectedLogVehicle = vehicles.find((v) => v.id === logForm.vehicleId);
   const automaticLogStatusFromDates = computeReservationStatusFromInputs(
     logForm.startsAt,
@@ -620,6 +770,156 @@ export default function BackofficePage() {
 
         {!loading && (
           <>
+            {/* ── Section 0 : Équipe ── */}
+            <section className="flex flex-col gap-4" style={{ order: 1 }}>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-base font-semibold">Équipe</h2>
+                <div className="flex items-center gap-2">
+                  <button type="button" className="vehicle-toggle cursor-pointer" onClick={() => setIsTeamCollapsed((v) => !v)}>
+                    {isTeamCollapsed ? "Déplier" : "Replier"}
+                  </button>
+                  <button
+                    type="button"
+                    className={`vehicle-toggle cursor-pointer ${showAddMember ? "vehicle-toggle-active" : ""}`}
+                    onClick={() => { setShowAddMember((v) => !v); setAddMemberError(null); }}
+                  >
+                    {showAddMember ? "Annuler" : "+ Ajouter"}
+                  </button>
+                </div>
+              </div>
+
+              {!isTeamCollapsed && (
+                <>
+                  {showAddMember && (
+                    <form onSubmit={handleAddMember} className="card p-4 flex flex-col gap-3">
+                      <p className="text-sm font-medium" style={{ color: "var(--muted)" }}>Nouveau membre</p>
+                      <input
+                        type="text"
+                        placeholder="Prénom Nom (ex : Nathan Dupont)"
+                        value={addMemberForm.name}
+                        onChange={(e) => setAddMemberForm((f) => ({ ...f, name: e.target.value }))}
+                        style={inputStyle}
+                        required
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email (optionnel)"
+                        value={addMemberForm.email}
+                        onChange={(e) => setAddMemberForm((f) => ({ ...f, email: e.target.value }))}
+                        style={inputStyle}
+                      />
+                      {addMemberError && <p className="text-xs" style={{ color: "var(--danger)" }}>{addMemberError}</p>}
+                      <button type="submit" disabled={addMemberLoading} style={primaryButtonStyle}>
+                        {addMemberLoading ? "Création…" : "Créer le membre"}
+                      </button>
+                    </form>
+                  )}
+
+                  {memberSaveError && <p className="text-xs" style={{ color: "var(--danger)" }}>{memberSaveError}</p>}
+
+                  {teamMembers.length === 0 && !showAddMember && (
+                    <p className="text-sm text-center py-4" style={{ color: "var(--muted)" }}>Aucun membre dans l'équipe.</p>
+                  )}
+
+                  <div className="flex flex-col gap-2">
+                    {teamMembers.map((member) => {
+                      const isEditing = editingMemberId === member.id;
+                      const draft = memberDrafts[member.id] ?? { name: member.name, email: member.email ?? "" };
+                      return (
+                        <div key={member.id} className="card p-4 flex flex-col gap-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium text-sm">{member.name}</p>
+                                <span
+                                  className="chip"
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    background: member.isAvailableForDispatch
+                                      ? "color-mix(in srgb, var(--success) 15%, var(--card-secondary))"
+                                      : "color-mix(in srgb, var(--muted) 15%, var(--card-secondary))",
+                                    color: member.isAvailableForDispatch ? "var(--success)" : "var(--muted)",
+                                    borderColor: "transparent",
+                                  }}
+                                >
+                                  {member.isAvailableForDispatch ? "Dispatch actif" : "Dispatch inactif"}
+                                </span>
+                              </div>
+                              {member.email && <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{member.email}</p>}
+                            </div>
+                            <div className="flex gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                className={`vehicle-toggle cursor-pointer ${member.isAvailableForDispatch ? "vehicle-toggle-active" : ""}`}
+                                onClick={() => handleToggleMemberAvailability(member)}
+                                title={member.isAvailableForDispatch ? "Désactiver du dispatch" : "Activer pour le dispatch"}
+                              >
+                                {member.isAvailableForDispatch ? "✓ Dispatch" : "Dispatch"}
+                              </button>
+                              <button
+                                type="button"
+                                className={`vehicle-toggle cursor-pointer ${isEditing ? "vehicle-toggle-active" : ""}`}
+                                onClick={() => {
+                                  setEditingMemberId(isEditing ? null : member.id);
+                                  setMemberSaveError(null);
+                                  if (!isEditing) setMemberDrafts((prev) => ({ ...prev, [member.id]: { name: member.name, email: member.email ?? "" } }));
+                                }}
+                              >
+                                {isEditing ? "Annuler" : "Modifier"}
+                              </button>
+                              {confirmDeleteMemberId === member.id ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="nav-button-danger cursor-pointer"
+                                    disabled={deletingMemberId === member.id}
+                                    onClick={() => handleDeleteMember(member.id)}
+                                  >
+                                    {deletingMemberId === member.id ? "…" : "Confirmer"}
+                                  </button>
+                                  <button type="button" className="vehicle-toggle cursor-pointer" onClick={() => setConfirmDeleteMemberId(null)}>✕</button>
+                                </>
+                              ) : (
+                                <button type="button" className="nav-button-danger cursor-pointer" onClick={() => setConfirmDeleteMemberId(member.id)}>
+                                  Supprimer
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {isEditing && (
+                            <div className="flex flex-col gap-2">
+                              <input
+                                type="text"
+                                placeholder="Prénom Nom"
+                                value={draft.name}
+                                onChange={(e) => setMemberDrafts((prev) => ({ ...prev, [member.id]: { ...prev[member.id], name: e.target.value } }))}
+                                style={inputStyle}
+                              />
+                              <input
+                                type="email"
+                                placeholder="Email (optionnel)"
+                                value={draft.email}
+                                onChange={(e) => setMemberDrafts((prev) => ({ ...prev, [member.id]: { ...prev[member.id], email: e.target.value } }))}
+                                style={inputStyle}
+                              />
+                              <button
+                                type="button"
+                                disabled={savingMemberId === member.id}
+                                onClick={() => handleSaveMember(member.id)}
+                                style={primaryButtonStyle}
+                              >
+                                {savingMemberId === member.id ? "Enregistrement…" : "Enregistrer"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </section>
+
             {/* ── Section 1 : Flotte ── */}
             <section className="flex flex-col gap-4" style={{ order: 2 }}>
               <div className="flex items-center justify-between gap-2">
@@ -707,21 +1007,93 @@ export default function BackofficePage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>
-                      Agence
-                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>
+                        Agence
+                      </label>
+                      <button
+                        type="button"
+                        className={`vehicle-toggle cursor-pointer`}
+                        style={{ fontSize: "0.7rem", padding: "2px 8px" }}
+                        onClick={() => { setShowAddAgency((v) => !v); setAddAgencyError(null); }}
+                      >
+                        {showAddAgency ? "Annuler" : "+ Nouvelle agence"}
+                      </button>
+                    </div>
                     <select
                       value={addForm.agencyId}
                       onChange={(e) => setAddForm((f) => ({ ...f, agencyId: e.target.value }))}
                       style={inputStyle}
                       required
                     >
+                      {agencies.length === 0 && (
+                        <option value="" disabled>Aucune agence — créez-en une</option>
+                      )}
                       {agencies.map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.name} ({a.brandLabel})
                         </option>
                       ))}
                     </select>
+                    {showAddAgency && (
+                      <form
+                        onSubmit={handleAddAgency}
+                        className="flex flex-col gap-2 card p-3 mt-1"
+                        style={{ background: "var(--card-secondary)" }}
+                      >
+                        <p className="text-xs font-medium" style={{ color: "var(--muted)" }}>
+                          Nouvelle agence
+                        </p>
+                        <input
+                          type="text"
+                          placeholder="Nom (ex : Citron Paris)"
+                          value={addAgencyForm.name}
+                          onChange={(e) => setAddAgencyForm((f) => ({ ...f, name: e.target.value }))}
+                          style={inputStyle}
+                          required
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Code unique (ex : CTR-75)"
+                            value={addAgencyForm.code}
+                            onChange={(e) => setAddAgencyForm((f) => ({ ...f, code: e.target.value }))}
+                            style={{ ...inputStyle, flex: 1 }}
+                            required
+                          />
+                          <input
+                            type="text"
+                            placeholder="Ville"
+                            value={addAgencyForm.city}
+                            onChange={(e) => setAddAgencyForm((f) => ({ ...f, city: e.target.value }))}
+                            style={{ ...inputStyle, flex: 1 }}
+                            required
+                          />
+                        </div>
+                        <div className="flex gap-1.5">
+                          {BRAND_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              className={`vehicle-toggle cursor-pointer ${addAgencyForm.brand === opt.value ? "vehicle-toggle-active" : ""}`}
+                              onClick={() => setAddAgencyForm((f) => ({ ...f, brand: opt.value }))}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        {addAgencyError && (
+                          <p className="text-xs" style={{ color: "var(--danger)" }}>{addAgencyError}</p>
+                        )}
+                        <button
+                          type="submit"
+                          disabled={addAgencyLoading}
+                          style={primaryButtonStyle}
+                        >
+                          {addAgencyLoading ? "Création…" : "Créer l'agence"}
+                        </button>
+                      </form>
+                    )}
                   </div>
                   {addError && (
                     <p className="text-xs" style={{ color: "var(--danger)" }}>{addError}</p>

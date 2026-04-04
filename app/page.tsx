@@ -32,7 +32,7 @@ import Link from "next/link";
 import { OverviewPanel } from "./dashboard/panels/overview/OverviewPanel";
 import { DispatchPanel } from "./dashboard/panels/dispatch/DispatchPanel";
 import { ReservationsPanel } from "./dashboard/panels/reservations/ReservationsPanel";
-import { PerformancePanel } from "./dashboard/panels/performance/PerformancePanel";
+import { TodoPanel, type TodoPanelTask } from "./dashboard/panels/todo/TodoPanel";
 
 const bookings: BookingItem[] = [];
 
@@ -155,8 +155,12 @@ export default function Home() {
     null,
   );
   const [relativeNow, setRelativeNow] = useState(Date.now());
+  const [tasks, setTasks] = useState<TodoPanelTask[]>([]);
+
   const [dispatchItems, setDispatchItems] = useState<DispatchItem[]>(initialDispatches);
   const [backofficeBookings, setBackofficeBookings] = useState<BookingItem[]>([]);
+  const [dispatchBookings, setDispatchBookings] = useState<BookingItem[]>([]);
+  const [dispatchOperators, setDispatchOperators] = useState<{ id: string; name: string }[]>([]);
   const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
   const [dispatchFilter, setDispatchFilter] = useState<"À assigner" | "Assigné" | null>(null);
 
@@ -167,10 +171,6 @@ export default function Home() {
     day: "numeric",
     month: "long",
   });
-
-  const visibleVehicles = fleetVehicles.filter(
-    (vehicle) => selectedBrand === "ALL" || vehicle.agency.brand === selectedBrand,
-  );
 
   const operators = employeeStats.map((e) => e.name);
 
@@ -267,6 +267,59 @@ export default function Home() {
     return () => { cancelled = true; };
   }, []);
 
+  // — Tasks —
+  useEffect(() => {
+    let cancelled = false;
+    const loadTasks = async () => {
+      try {
+        const response = await fetch("/api/tasks", { cache: "no-store" });
+        if (response.status === 401) return;
+        const payload = (await response.json()) as { ok: boolean; tasks?: TodoPanelTask[] };
+        if (!payload.ok || cancelled) return;
+        if (payload.tasks) setTasks(payload.tasks);
+      } catch { /* silencieux */ }
+    };
+    void loadTasks();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleTaskStatusChange = (id: string, status: TodoPanelTask["status"]) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
+    void fetch(`/api/tasks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: task.title, scheduledAt: task.scheduledAt, durationMinutes: task.durationMinutes, notes: "", assignedToId: task.assignedTo?.id ?? null, vehicleId: task.vehicle?.id ?? null, status }),
+    }).catch(() => setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: task.status } : t)));
+  };
+
+  // — Dispatch —
+  useEffect(() => {
+    let cancelled = false;
+    const loadDispatches = async () => {
+      try {
+        const response = await fetch("/api/dispatch/items", { cache: "no-store" });
+        if (response.status === 401) return;
+        const payload = (await response.json()) as {
+          ok: boolean;
+          dispatches?: DispatchItem[];
+          bookings?: BookingItem[];
+          operators?: { id: string; name: string }[];
+        };
+        if (!payload.ok) return;
+        if (cancelled) return;
+        if (payload.dispatches) setDispatchItems(payload.dispatches);
+        if (payload.bookings) setDispatchBookings(payload.bookings);
+        if (payload.operators) setDispatchOperators(payload.operators);
+      } catch {
+        // silencieux — le panel reste vide
+      }
+    };
+    void loadDispatches();
+    return () => { cancelled = true; };
+  }, []);
+
   // — Openclaw ping —
   useEffect(() => {
     let cancelled = false;
@@ -313,7 +366,7 @@ export default function Home() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            operators: dispatchOperators,
+            operators: operators,
             bookings,
             dispatchItems,
           }),
@@ -383,23 +436,35 @@ export default function Home() {
 
   const handleAssignOperator = (name: string) => {
     if (!selectedDispatchId) return;
+    const operator = dispatchOperators.find((o) => o.name === name);
+    const dispatch = dispatchItems.find((d) => d.id === selectedDispatchId);
+    if (!dispatch) return;
+
+    const isAssigned = dispatch.members.includes(name);
+    const newMembers = isAssigned ? [] : [name];
+    const operatorId = isAssigned ? null : (operator?.id ?? null);
+
     setDispatchItems((current) =>
       current.map((d) => {
         if (d.id !== selectedDispatchId) return d;
-        const isAssigned = d.members.includes(name);
-        const newMembers = isAssigned ? [] : [name];
         return { ...d, members: newMembers, state: newMembers.length > 0 ? "Assigné" : "À assigner" };
       }),
     );
+
+    void fetch(`/api/dispatch/items/${selectedDispatchId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operatorId }),
+    }).catch((err) => console.error("Dispatch assign failed", err));
   };
   const tabletRightBottom = 1 - layout.tabletRightTop;
 
   const sharedDispatchPanelProps = {
     dispatchItems,
-    bookings: dashboardBookings,
+    bookings: dispatchBookings,
     dispatchFilter,
     selectedDispatchId,
-    operators: dispatchOperators,
+    operators: dispatchOperators.map((o) => o.name),
     onFilterChange: setDispatchFilter,
     onSelectDispatch: setSelectedDispatchId,
     onAssignOperator: handleAssignOperator,
@@ -433,6 +498,9 @@ export default function Home() {
             </button>
             <Link href="/backoffice" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
               Backoffice
+            </Link>
+            <Link href="/todo" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
+              Tâches
             </Link>
 
             <span className="nav-divider" aria-hidden="true" />
@@ -495,7 +563,7 @@ export default function Home() {
                   <DispatchPanel {...sharedDispatchPanelProps} />
                 </article>
                 <article className="dashboard-panel card shrink-0 p-4">
-                  <PerformancePanel employees={employeeStats} size="compact" />
+                  <TodoPanel tasks={tasks} size="compact" onStatusChange={handleTaskStatusChange} />
                 </article>
               </div>
             </div>
@@ -507,7 +575,7 @@ export default function Home() {
             />
 
             <article ref={desktopRightRef} className="dashboard-panel card panel-priority p-4">
-              <ReservationsPanel bookings={dashboardBookings} size="full" />
+              <ReservationsPanel bookings={backofficeBookings} size="full" />
             </article>
           </section>
 
@@ -549,7 +617,7 @@ export default function Home() {
               style={{ gridTemplateRows: `minmax(min-content, ${layout.tabletRightTop}fr) 0.6rem minmax(min-content, ${tabletRightBottom}fr)` }}
             >
               <article className="dashboard-panel card panel-priority p-4">
-                <ReservationsPanel bookings={dashboardBookings} size="full" />
+                <ReservationsPanel bookings={backofficeBookings} size="full" />
               </article>
 
               <Splitter
@@ -559,7 +627,7 @@ export default function Home() {
               />
 
               <article className="dashboard-panel card p-4">
-                <PerformancePanel employees={employeeStats} size="full" />
+                <TodoPanel tasks={tasks} size="full" onStatusChange={handleTaskStatusChange} />
               </article>
             </div>
           </section>
@@ -571,7 +639,7 @@ export default function Home() {
             </article>
 
             <article className="dashboard-panel card panel-priority p-4">
-              <ReservationsPanel bookings={dashboardBookings} size="compact" />
+              <ReservationsPanel bookings={backofficeBookings} size="compact" />
             </article>
 
             <article className="dashboard-panel card p-4">
@@ -579,7 +647,7 @@ export default function Home() {
             </article>
 
             <article className="dashboard-panel card p-4">
-              <PerformancePanel employees={employeeStats} size="compact" />
+              <TodoPanel tasks={tasks} size="compact" onStatusChange={handleTaskStatusChange} />
             </article>
           </section>
         )}

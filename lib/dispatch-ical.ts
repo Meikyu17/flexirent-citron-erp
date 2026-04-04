@@ -12,6 +12,7 @@ const sourceLabel: Record<BookingItem["source"], string> = {
   "Fleetee B": "Fleetee",
   Getaround: "Getaround",
   Turo: "Turo",
+  Direct: "Direct",
 };
 
 const DEFAULT_START_HOUR = 12;
