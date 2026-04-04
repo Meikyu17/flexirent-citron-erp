@@ -22,7 +22,7 @@ type Task = {
   createdAt: string;
 };
 
-type Operator = { id: string; name: string };
+type TaskAssigneeOption = { id: string; name: string };
 type Vehicle = { id: string; model: string; plateNumber: string };
 
 type TaskForm = {
@@ -78,7 +78,7 @@ function toDateTimeLocal(iso: string | null) {
 export default function TodoPage() {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [operators, setOperators] = useState<Operator[]>([]);
+  const [assignees, setAssignees] = useState<TaskAssigneeOption[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,20 +110,23 @@ export default function TodoPage() {
       try {
         const [tRes, oRes, vRes] = await Promise.all([
           fetch("/api/tasks", { cache: "no-store" }),
-          fetch("/api/dispatch/items", { cache: "no-store" }),
+          fetch("/api/backoffice/team", { cache: "no-store" }),
           fetch("/api/backoffice/vehicles", { cache: "no-store" }),
         ]);
-        if (tRes.status === 401) { router.push("/login"); return; }
+        if (tRes.status === 401 || oRes.status === 401 || vRes.status === 401) {
+          router.push("/login");
+          return;
+        }
 
         const [tData, oData, vData] = await Promise.all([
           tRes.json() as Promise<{ ok: boolean; tasks?: Task[] }>,
-          oRes.json() as Promise<{ ok: boolean; operators?: Operator[] }>,
+          oRes.json() as Promise<{ ok: boolean; members?: TaskAssigneeOption[] }>,
           vRes.json() as Promise<{ ok: boolean; vehicles?: { id: string; model: string; plateNumber: string }[] }>,
         ]);
 
         if (cancelled) return;
         if (tData.ok && tData.tasks) setTasks(tData.tasks);
-        if (oData.ok && oData.operators) setOperators(oData.operators);
+        if (oData.ok && oData.members) setAssignees(oData.members);
         if (vData.ok && vData.vehicles) setVehicles(vData.vehicles);
       } catch {
         if (!cancelled) setError("Erreur de chargement");
@@ -223,6 +226,7 @@ export default function TodoPage() {
         scheduledAt: task.scheduledAt,
         durationMinutes: task.durationMinutes,
         notes: task.notes ?? "",
+        location: task.location ?? "",
         assignedToId: task.assignedTo?.id ?? null,
         vehicleId: task.vehicle?.id ?? null,
         status: next,
@@ -362,8 +366,8 @@ export default function TodoPage() {
                       style={inputStyle}
                     >
                       <option value="">— Personne —</option>
-                      {operators.map((o) => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
+                      {assignees.map((assignee) => (
+                        <option key={assignee.id} value={assignee.id}>{assignee.name}</option>
                       ))}
                     </select>
                   </div>

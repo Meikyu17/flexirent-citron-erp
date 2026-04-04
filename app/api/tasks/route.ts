@@ -1,5 +1,11 @@
 import { getAuthUserFromCookie, unauthorizedResponse } from "@/lib/auth";
-import { createTask, listTasks, serializeTask } from "@/lib/tasks";
+import {
+  createTask,
+  listTasks,
+  serializeTask,
+  TaskValidationError,
+  validateTaskRelations,
+} from "@/lib/tasks";
 
 export async function GET() {
   const user = await getAuthUserFromCookie();
@@ -34,18 +40,26 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, error: "Le titre est requis." }, { status: 400 });
     }
 
+    const relations = await validateTaskRelations({
+      assignedToId: body.assignedToId || null,
+      vehicleId: body.vehicleId || null,
+    });
+
     const task = await createTask({
       title,
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
       durationMinutes: body.durationMinutes ?? null,
       notes: body.notes?.trim() ?? "",
       location: body.location?.trim() ?? "",
-      assignedToId: body.assignedToId || null,
-      vehicleId: body.vehicleId || null,
+      assignedToId: relations.assignedToId,
+      vehicleId: relations.vehicleId,
     });
 
     return Response.json({ ok: true, task: serializeTask(task) }, { status: 201 });
   } catch (error) {
+    if (error instanceof TaskValidationError) {
+      return Response.json({ ok: false, error: error.message }, { status: 400 });
+    }
     console.error("POST /api/tasks failed", error);
     return Response.json({ ok: false, error: "Erreur lors de la création." }, { status: 503 });
   }

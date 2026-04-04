@@ -2,7 +2,6 @@
 
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -14,7 +13,6 @@ import type {
   BookingItem,
   DispatchItem,
   EmployeeStat,
-  OpenclawPingStatus,
 } from "./dashboard/shared/types";
 import {
   clamp,
@@ -111,29 +109,6 @@ function mapBackofficeLogToBooking(log: BackofficeReservationLog): BookingItem |
   };
 }
 
-function formatScrapeElapsed(lastScrapeAt: string | null, now: number): string {
-  if (!lastScrapeAt) return "jamais";
-
-  const ts = Date.parse(lastScrapeAt);
-  if (Number.isNaN(ts)) return "inconnu";
-
-  const elapsedMs = Math.max(0, now - ts);
-  const minute = 60_000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-
-  if (elapsedMs < minute) return "moins d'1 min";
-  if (elapsedMs < hour) return `${Math.floor(elapsedMs / minute)} min`;
-  if (elapsedMs < day) return `${Math.floor(elapsedMs / hour)} h`;
-  if (elapsedMs < 7 * day) return `${Math.floor(elapsedMs / day)} j`;
-
-  return new Date(ts).toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
 export default function Home() {
   const router = useRouter();
   const desktopRootRef = useRef<HTMLDivElement>(null);
@@ -150,11 +125,6 @@ export default function Home() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [overviewFleetVehicles, setOverviewFleetVehicles] = useState<OverviewFleetVehicle[]>([]);
   const [overviewFleetLoading, setOverviewFleetLoading] = useState(true);
-  const [openclawStatus, setOpenclawStatus] = useState<OpenclawPingStatus>("checking");
-  const [lastOpenclawScrapeAt, setLastOpenclawScrapeAt] = useState<string | null>(
-    null,
-  );
-  const [relativeNow, setRelativeNow] = useState(Date.now());
   const [tasks, setTasks] = useState<TodoPanelTask[]>([]);
   const [panelConfig, setPanelConfig] = useState<Record<string, boolean>>({
     overview: true, dispatch: true, reservations: true, todo: true,
@@ -189,6 +159,7 @@ export default function Home() {
   const [dispatchOperators, setDispatchOperators] = useState<{ id: string; name: string }[]>([]);
   const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
   const [dispatchFilter, setDispatchFilter] = useState<"À assigner" | "Assigné" | null>(null);
+  const [dispatchCollapsed, setDispatchCollapsed] = useState(false);
 
 
 
@@ -325,7 +296,16 @@ export default function Home() {
     void fetch(`/api/tasks/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: task.title, scheduledAt: task.scheduledAt, durationMinutes: task.durationMinutes, notes: "", assignedToId: task.assignedTo?.id ?? null, vehicleId: task.vehicle?.id ?? null, status }),
+      body: JSON.stringify({
+        title: task.title,
+        scheduledAt: task.scheduledAt,
+        durationMinutes: task.durationMinutes,
+        notes: task.notes ?? "",
+        location: task.location ?? "",
+        assignedToId: task.assignedTo?.id ?? null,
+        vehicleId: task.vehicle?.id ?? null,
+        status,
+      }),
     }).catch(() => setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: task.status } : t)));
   };
 
@@ -353,42 +333,6 @@ export default function Home() {
     };
     void loadDispatches();
     return () => { cancelled = true; };
-  }, []);
-
-  // — Openclaw ping —
-  useEffect(() => {
-    let cancelled = false;
-    const ping = async () => {
-      try {
-        const response = await fetch("/api/openclaw/status", {
-          method: "GET",
-          cache: "no-store",
-        });
-        const payload = (await response.json()) as {
-          ok: boolean;
-          lastScrapeAt?: string | null;
-        };
-
-        if (cancelled) return;
-        if (!response.ok || !payload.ok) {
-          setOpenclawStatus("offline");
-          return;
-        }
-
-        setOpenclawStatus("online");
-        setLastOpenclawScrapeAt(payload.lastScrapeAt ?? null);
-      } catch {
-        if (!cancelled) setOpenclawStatus("offline");
-      }
-    };
-    void ping();
-    const intervalId = window.setInterval(() => void ping(), 15000);
-    return () => { cancelled = true; window.clearInterval(intervalId); };
-  }, []);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => setRelativeNow(Date.now()), 60_000);
-    return () => window.clearInterval(intervalId);
   }, []);
 
   // — Dispatch iCal sync —
@@ -421,7 +365,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [dispatchItems]);
+  }, [dispatchItems, operators]);
 
   // — Resize —
   useEffect(() => {
@@ -500,9 +444,11 @@ export default function Home() {
     dispatchFilter,
     selectedDispatchId,
     operators: dispatchOperators.map((o) => o.name),
+    collapsed: dispatchCollapsed,
     onFilterChange: setDispatchFilter,
     onSelectDispatch: setSelectedDispatchId,
     onAssignOperator: handleAssignOperator,
+    onToggleCollapsed: () => setDispatchCollapsed((current) => !current),
   };
 
   const overviewProps = {
@@ -537,16 +483,6 @@ export default function Home() {
             <Link href="/todo" className="vehicle-toggle cursor-pointer" style={{ textDecoration: "none" }}>
               Tâches
             </Link>
-
-            <span className="nav-divider" aria-hidden="true" />
-
-            <span className="chip">
-              Scraping Openclaw:{" "}
-              {openclawStatus === "offline"
-                ? "indisponible"
-                : `il y a ${formatScrapeElapsed(lastOpenclawScrapeAt, relativeNow)}`}
-            </span>
-
             <span className="nav-divider" aria-hidden="true" />
 
             <button
@@ -602,12 +538,16 @@ export default function Home() {
 
               <div className="flex min-h-0 flex-col gap-[0.6rem]">
                 {panelConfig.dispatch && (
-                  <article className="dashboard-panel card flex-1 p-4">
+                  <article
+                    className={`dashboard-panel card p-4 ${dispatchCollapsed ? "shrink-0" : "flex-1"}`}
+                  >
                     <DispatchPanel {...sharedDispatchPanelProps} />
                   </article>
                 )}
                 {panelConfig.todo && (
-                  <article className="dashboard-panel card shrink-0 p-4">
+                  <article
+                    className={`dashboard-panel card p-4 ${dispatchCollapsed ? "flex-1" : "shrink-0"}`}
+                  >
                     <TodoPanel tasks={tasks} size="compact" onStatusChange={handleTaskStatusChange} />
                   </article>
                 )}
@@ -636,7 +576,11 @@ export default function Home() {
             <div
               ref={tabletLeftRef}
               className="split-column"
-              style={{ gridTemplateRows: "auto 0.6rem minmax(min-content, 1fr)" }}
+              style={{
+                gridTemplateRows: dispatchCollapsed
+                  ? "auto 0.6rem auto"
+                  : "auto 0.6rem minmax(min-content, 1fr)",
+              }}
             >
               {panelConfig.overview && (
                 <article className="dashboard-panel card p-3 md:p-4">
@@ -716,4 +660,3 @@ export default function Home() {
     </div>
   );
 }
-

@@ -9,6 +9,7 @@ export type TodoPanelTask = {
   title: string;
   scheduledAt: string | null;
   durationMinutes: number | null;
+  notes?: string | null;
   location: string | null;
   status: TaskStatus;
   assignedTo: { id: string; name: string } | null;

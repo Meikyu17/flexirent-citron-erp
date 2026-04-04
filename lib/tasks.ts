@@ -8,6 +8,49 @@ const taskInclude = {
 
 export type TaskRow = Awaited<ReturnType<typeof listTasks>>[number];
 
+export class TaskValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TaskValidationError";
+  }
+}
+
+export async function validateTaskRelations(data: {
+  assignedToId: string | null;
+  vehicleId: string | null;
+}) {
+  const assignedToId = data.assignedToId?.startsWith("ical-")
+    ? data.assignedToId.slice(5)
+    : data.assignedToId;
+
+  if (assignedToId) {
+    const assignee = await prisma.dispatchIcalEmployee.findUnique({
+      where: { id: assignedToId },
+      select: { id: true },
+    });
+
+    if (!assignee) {
+      throw new TaskValidationError("Le membre sélectionné est invalide.");
+    }
+  }
+
+  if (data.vehicleId) {
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: data.vehicleId },
+      select: { id: true },
+    });
+
+    if (!vehicle) {
+      throw new TaskValidationError("Le véhicule sélectionné est invalide.");
+    }
+  }
+
+  return {
+    assignedToId: assignedToId ?? null,
+    vehicleId: data.vehicleId ?? null,
+  };
+}
+
 export async function listTasks(filter?: { status?: TaskStatus }) {
   return prisma.task.findMany({
     where: filter?.status ? { status: filter.status } : undefined,

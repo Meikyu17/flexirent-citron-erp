@@ -1,5 +1,11 @@
 import { getAuthUserFromCookie, unauthorizedResponse } from "@/lib/auth";
-import { deleteTask, serializeTask, updateTask } from "@/lib/tasks";
+import {
+  deleteTask,
+  serializeTask,
+  TaskValidationError,
+  updateTask,
+  validateTaskRelations,
+} from "@/lib/tasks";
 import { TaskStatus } from "@prisma/client";
 
 export async function PATCH(
@@ -33,19 +39,27 @@ export async function PATCH(
       ? (body.status as TaskStatus)
       : TaskStatus.TODO;
 
+    const relations = await validateTaskRelations({
+      assignedToId: body.assignedToId || null,
+      vehicleId: body.vehicleId || null,
+    });
+
     const task = await updateTask(id, {
       title,
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
       durationMinutes: body.durationMinutes ?? null,
       notes: body.notes?.trim() ?? "",
       location: body.location?.trim() ?? "",
-      assignedToId: body.assignedToId || null,
-      vehicleId: body.vehicleId || null,
+      assignedToId: relations.assignedToId,
+      vehicleId: relations.vehicleId,
       status,
     });
 
     return Response.json({ ok: true, task: serializeTask(task) });
   } catch (error) {
+    if (error instanceof TaskValidationError) {
+      return Response.json({ ok: false, error: error.message }, { status: 400 });
+    }
     console.error(`PATCH /api/tasks/${id} failed`, error);
     return Response.json({ ok: false, error: "Erreur lors de la modification." }, { status: 503 });
   }
