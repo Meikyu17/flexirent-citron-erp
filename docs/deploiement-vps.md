@@ -122,6 +122,141 @@ Tu dois obtenir:
 - `citronlocation.fr` -> IP du serveur A
 - `admin.citronlocation.fr` -> IP du serveur B
 
+## Configuration finale du serveur B
+
+Pour ton serveur B `193.168.146.217`, voici la configuration a appliquer.
+
+### 1. DNS Hostinger
+
+Tu dois avoir cet enregistrement:
+
+- `Type`: `A`
+- `Nom`: `admin`
+- `Pointe vers`: `193.168.146.217`
+- `TTL`: `14400`
+
+### 2. Variables applicatives sur le serveur B
+
+Dans `.env.docker` sur le serveur B, mets au minimum:
+
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=remplace-par-un-secret-fort
+POSTGRES_DB=citron_erp
+DATABASE_URL=postgresql://postgres:remplace-par-un-secret-fort@db:5432/citron_erp?schema=public
+
+AUTH_SECRET=remplace-par-un-secret-long-et-aleatoire
+
+CITRON_MANAGER_EMAIL=manager@citronlocation.fr
+CITRON_MANAGER_PASSWORD=remplace-par-un-mot-de-passe-fort
+CITRON_OPERATOR_EMAIL=dispatch@citronlocation.fr
+CITRON_OPERATOR_PASSWORD=remplace-par-un-mot-de-passe-fort
+
+DOMAIN=admin.citronlocation.fr
+APP_PORT=3002
+TZ=Europe/Paris
+```
+
+### 3. Demarrage Docker sur le serveur B
+
+```bash
+cd /srv
+git clone <ton-repo> citron-erp
+cd citron-erp
+cp .env.docker.example .env.docker
+# edite ensuite .env.docker
+./scripts/deploy-vps.sh
+```
+
+### 4. Reverse proxy recommande sur le serveur B: Caddy
+
+Si tu n'as encore rien d'installe sur le serveur B, je te recommande `Caddy` car il gere HTTPS automatiquement.
+
+Le fichier pret a copier-coller est:
+
+- `deploy/server-b.caddyfile`
+
+Contenu:
+
+```caddy
+admin.citronlocation.fr {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:3002
+}
+```
+
+Exemple d'installation et d'activation:
+
+```bash
+sudo apt update
+sudo apt install -y caddy
+sudo cp /srv/citron-erp/deploy/server-b.caddyfile /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+sudo systemctl status caddy
+```
+
+### 5. Alternative si ton serveur B utilise deja Nginx
+
+Le fichier pret a copier-coller est:
+
+- `deploy/server-b.nginx.conf`
+
+Exemple d'activation:
+
+```bash
+sudo cp /srv/citron-erp/deploy/server-b.nginx.conf /etc/nginx/sites-available/admin.citronlocation.fr
+sudo ln -s /etc/nginx/sites-available/admin.citronlocation.fr /etc/nginx/sites-enabled/admin.citronlocation.fr
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Si tu utilises Nginx, il faudra aussi creer le certificat TLS pour `admin.citronlocation.fr`, par exemple avec Certbot.
+
+### 6. Pare-feu du serveur B
+
+Si `ufw` est actif sur le serveur B:
+
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+sudo ufw status
+```
+
+### 7. Verification finale
+
+Depuis le serveur B:
+
+```bash
+docker compose -f docker-compose.vps.yml --env-file .env.docker ps
+curl -I http://127.0.0.1:3002/login
+curl -I https://admin.citronlocation.fr/login
+```
+
+Puis pour l'iCal:
+
+```bash
+docker compose -f docker-compose.vps.yml --env-file .env.docker exec -e ICAL_BASE_URL=https://admin.citronlocation.fr app npm run db:seed:dispatch-ical:test
+curl -I "https://admin.citronlocation.fr/api/dispatch/ical?token=COLLE_ICI_UN_TOKEN"
+```
+
+Tu dois obtenir:
+
+- une page de login accessible sur `https://admin.citronlocation.fr/login`
+- une reponse `200` sur le flux iCal
+- un `Content-Type: text/calendar; charset=utf-8` pour l'URL iCal
+
+### 8. Resume ultra simple
+
+Sur `193.168.146.217`:
+
+1. deployer l'app avec `./scripts/deploy-vps.sh`
+2. mettre `DOMAIN=admin.citronlocation.fr`
+3. exposer l'app seulement en local sur `127.0.0.1:3002`
+4. faire pointer `admin.citronlocation.fr` vers `127.0.0.1:3002` avec Caddy ou Nginx
+5. verifier `https://admin.citronlocation.fr/login`
+
 ## Architecture recommandee
 
 Choisis un sous-domaine dedie, par exemple `erp.tondomaine.fr`.
