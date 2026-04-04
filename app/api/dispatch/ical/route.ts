@@ -59,6 +59,7 @@ export async function GET(request: Request) {
           reservationRef: event.reservationRef,
           missionLabel: event.missionLabel,
           customerName: event.customerName,
+          customerPhone: event.customerPhone,
           operationType: event.operationType,
           vehicleModel: event.vehicleModel,
           plateNumber: event.plateNumber,

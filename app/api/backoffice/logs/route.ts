@@ -4,6 +4,7 @@ import {
   findOverlappingReservationConflict,
   listStatusLogs,
   resolveReservationDisplayStatusFromDates,
+  upsertSavedAddresses,
 } from "@/lib/backoffice";
 import { AgencyBrand, RentalPlatform, VehicleOperationalStatus } from "@prisma/client";
 import { z } from "zod";
@@ -66,6 +67,8 @@ function serializeLog(
     agencyBrandLabel: brandLabels[log.agencyBrand],
     platform: log.platform,
     notes: log.notes,
+    pickupAddress: log.pickupAddress ?? null,
+    returnAddress: log.returnAddress ?? null,
     createdAt: log.createdAt.toISOString(),
   };
 }
@@ -107,6 +110,8 @@ const createLogSchema = z.object({
   agencyBrand: z.nativeEnum(AgencyBrand),
   platform: z.nativeEnum(RentalPlatform).nullable().optional(),
   notes: z.string().trim().max(500).default(""),
+  pickupAddress: z.string().trim().max(300).nullable().optional(),
+  returnAddress: z.string().trim().max(300).nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -174,6 +179,12 @@ export async function POST(request: Request) {
     }
   }
 
+  const pickupAddress = d.pickupAddress || null;
+  const returnAddress = d.returnAddress || null;
+
+  // Persist new addresses for future autocomplete
+  await upsertSavedAddresses([pickupAddress, returnAddress]).catch(() => {});
+
   try {
     const log = await createStatusLog({
       vehicleId: d.vehicleId,
@@ -185,6 +196,8 @@ export async function POST(request: Request) {
       agencyBrand: d.agencyBrand,
       platform: d.platform ?? null,
       notes: d.notes,
+      pickupAddress,
+      returnAddress,
     });
     return Response.json({ ok: true, log: serializeLog(log) }, { status: 201 });
   } catch (error) {

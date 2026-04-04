@@ -97,6 +97,7 @@ export type DispatchIcalEventPayload = {
   reservationRef: string;
   missionLabel: string;
   customerName: string;
+  customerPhone: string | null;
   operationType: DispatchIcalOperationType;
   agencyLabel: string;
   sourceLabel: string;
@@ -105,7 +106,7 @@ export type DispatchIcalEventPayload = {
   appointmentLocation: string;
   appointmentAt: Date;
   endsAt: Date;
-  notes: string;
+  notes: string | null;
 };
 
 export function buildDispatchIcalEvent(
@@ -134,6 +135,7 @@ export function buildDispatchIcalEvent(
     reservationRef: booking.id,
     missionLabel: dispatch.mission,
     customerName: booking.client,
+    customerPhone: booking.customerPhone ?? null,
     operationType,
     agencyLabel: agencyLabel[booking.agency],
     sourceLabel: sourceLabel[booking.source],
@@ -142,7 +144,7 @@ export function buildDispatchIcalEvent(
     appointmentLocation: slot.location,
     appointmentAt: startAt,
     endsAt,
-    notes: vehicleLocationSentence,
+    notes: booking.notes ?? null,
   };
 }
 
@@ -150,6 +152,7 @@ export type IcalDescriptionInput = {
   reservationRef: string;
   missionLabel: string;
   customerName: string;
+  customerPhone?: string | null;
   operationType: DispatchIcalOperationType;
   vehicleModel: string;
   plateNumber: string;
@@ -161,21 +164,29 @@ export type IcalDescriptionInput = {
 };
 
 export function buildIcalDescription(input: IcalDescriptionInput) {
+  const operationType = operationLabel(input.operationType);
   const lines = [
-    `Client: ${input.customerName}`,
-    `Operation: ${operationLabel(input.operationType)}`,
-    `Vehicule: ${input.vehicleModel}`,
-    `Plaque: ${input.plateNumber}`,
-    `Rendez-vous: ${formatAppointmentLabel(input.appointmentAt)}`,
-    `Emplacement: ${input.appointmentLocation}`,
-    `Agence: ${input.agencyLabel}`,
-    `Plateforme: ${input.sourceLabel}`,
-    `Reservation: ${input.reservationRef}`,
-    `Mission dispatch: ${input.missionLabel}`,
+    `--- ${operationType.toUpperCase()} ---`,
+    `Client : ${input.customerName}`,
   ];
 
+  if (input.customerPhone) {
+    lines.push(`Téléphone : ${input.customerPhone}`);
+  }
+
+  lines.push(
+    `Véhicule : ${input.vehicleModel} (${input.plateNumber})`,
+    `Opération : ${operationType}`,
+    `Lieu : ${input.appointmentLocation}`,
+    `Rendez-vous : ${formatAppointmentLabel(input.appointmentAt)}`,
+    `Agence : ${input.agencyLabel}`,
+    `Plateforme : ${input.sourceLabel}`,
+    `Réf. mission : ${input.missionLabel}`,
+    `Réf. réservation : ${input.reservationRef}`,
+  );
+
   if (input.notes) {
-    lines.push(`Note: ${input.notes}`);
+    lines.push(``, `Note : ${input.notes}`);
   }
 
   return lines.join("\n");

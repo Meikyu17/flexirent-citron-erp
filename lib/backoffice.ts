@@ -341,6 +341,17 @@ export async function updateBackofficeVehicle(
   });
 }
 
+export async function upsertSavedAddresses(labels: (string | null | undefined)[]) {
+  const valid = [...new Set(labels.filter((l): l is string => Boolean(l?.trim())))];
+  for (const label of valid) {
+    await prisma.savedAddress.upsert({
+      where: { label },
+      update: {},
+      create: { label },
+    });
+  }
+}
+
 export async function createStatusLog(data: {
   vehicleId: string;
   status: VehicleOperationalStatus;
@@ -351,6 +362,8 @@ export async function createStatusLog(data: {
   agencyBrand: AgencyBrand;
   platform: RentalPlatform | null;
   notes: string;
+  pickupAddress: string | null;
+  returnAddress: string | null;
 }) {
   return prisma.$transaction(async (tx) => {
     const log = await tx.vehicleStatusLog.create({
@@ -364,6 +377,8 @@ export async function createStatusLog(data: {
         agencyBrand: data.agencyBrand,
         platform: data.platform,
         notes: data.notes || null,
+        pickupAddress: data.pickupAddress || null,
+        returnAddress: data.returnAddress || null,
       },
       include: {
         vehicle: { select: { model: true, plateNumber: true } },

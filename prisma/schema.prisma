@@ -100,7 +100,15 @@ model VehicleStatusLog {
   platform              RentalPlatform?
   notes                 String?
   assignedOperatorName  String?
+  pickupAddress         String?
+  returnAddress         String?
   createdAt             DateTime                 @default(now())
+}
+
+model SavedAddress {
+  id        String   @id @default(cuid())
+  label     String   @unique
+  createdAt DateTime @default(now())
 }
 
 model Reservation {
@@ -246,6 +254,7 @@ model DispatchIcalEvent {
   reservationRef      String
   missionLabel        String
   customerName        String
+  customerPhone       String?
   operationType       DispatchIcalOperationType
   agencyLabel         String
   sourceLabel         String

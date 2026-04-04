@@ -63,7 +63,11 @@ type LogForm = {
   agencyBrand: AgencyBrand;
   platform: RentalPlatform | null;
   notes: string;
+  pickupAddress: string;
+  returnAddress: string;
 };
+
+type SavedAddress = { id: string; label: string };
 
 type AddVehicleForm = {
   model: string;
@@ -227,7 +231,11 @@ export default function BackofficePage() {
     agencyBrand: "CITRON_LOCATION",
     platform: null,
     notes: "",
+    pickupAddress: "",
+    returnAddress: "",
   });
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [deletingAddressId, setDeletingAddressId] = useState<string | null>(null);
   const [logLoading, setLogLoading] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
   const [logSuccess, setLogSuccess] = useState(false);
@@ -273,11 +281,12 @@ export default function BackofficePage() {
       setLoading(true);
       setError(null);
       try {
-        const [vRes, aRes, lRes, tRes] = await Promise.all([
+        const [vRes, aRes, lRes, tRes, addrRes] = await Promise.all([
           fetch("/api/backoffice/vehicles", { cache: "no-store" }),
           fetch("/api/backoffice/agencies", { cache: "no-store" }),
           fetch("/api/backoffice/logs", { cache: "no-store" }),
           fetch("/api/backoffice/team", { cache: "no-store" }),
+          fetch("/api/backoffice/addresses", { cache: "no-store" }),
         ]);
 
         if (vRes.status === 401 || aRes.status === 401) {
@@ -285,11 +294,12 @@ export default function BackofficePage() {
           return;
         }
 
-        const [vData, aData, lData, tData] = await Promise.all([
+        const [vData, aData, lData, tData, addrData] = await Promise.all([
           vRes.json() as Promise<{ ok: boolean; vehicles?: BackofficeVehicle[]; error?: string }>,
           aRes.json() as Promise<{ ok: boolean; agencies?: BackofficeAgency[] }>,
           lRes.json() as Promise<{ ok: boolean; logs?: StatusLog[] }>,
           tRes.json() as Promise<{ ok: boolean; members?: TeamMember[] }>,
+          addrRes.json() as Promise<{ ok: boolean; addresses?: SavedAddress[] }>,
         ]);
 
         if (cancelled) return;
@@ -325,6 +335,7 @@ export default function BackofficePage() {
           setTeamMembers(tData.members);
           setMemberDrafts(Object.fromEntries(tData.members.map((m) => [m.id, { name: m.name, email: m.email ?? "" }])));
         }
+        if (addrData.ok && addrData.addresses) setSavedAddresses(addrData.addresses);
       } catch (err) {
         if (!cancelled)
           setError(err instanceof Error ? err.message : "Erreur de chargement");
@@ -500,6 +511,16 @@ export default function BackofficePage() {
     }
   };
 
+  const handleDeleteAddress = async (id: string) => {
+    setDeletingAddressId(id);
+    try {
+      await fetch(`/api/backoffice/addresses/${id}`, { method: "DELETE" });
+      setSavedAddresses((prev) => prev.filter((a) => a.id !== id));
+    } catch { /* silencieux */ } finally {
+      setDeletingAddressId(null);
+    }
+  };
+
   const handleSubmitLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!logForm.vehicleId) {
@@ -540,6 +561,11 @@ export default function BackofficePage() {
 
       setLogs((prev) => [data.log!, ...prev.slice(0, 14)]);
       await syncVehiclesFromApi();
+      // Refresh saved addresses in case new ones were added
+      fetch("/api/backoffice/addresses", { cache: "no-store" })
+        .then((r) => r.json() as Promise<{ ok: boolean; addresses?: SavedAddress[] }>)
+        .then((d) => { if (d.ok && d.addresses) setSavedAddresses(d.addresses); })
+        .catch(() => {});
       setLogForm((prev) => ({
         ...prev,
         customerName: "",
@@ -548,6 +574,8 @@ export default function BackofficePage() {
         endsAt: "",
         platform: null,
         notes: "",
+        pickupAddress: "",
+        returnAddress: "",
       }));
       setLogSuccess(true);
       setTimeout(() => setLogSuccess(false), 3000);
@@ -1422,6 +1450,77 @@ export default function BackofficePage() {
                       style={inputStyle}
                     />
                   </div>
+                </div>
+
+                {/* Addresses */}
+                <div className="flex flex-col gap-3">
+                  {["pickup", "return"].map((kind) => {
+                    const field = kind === "pickup" ? "pickupAddress" : "returnAddress";
+                    const value = logForm[field as "pickupAddress" | "returnAddress"];
+                    const label = kind === "pickup" ? "Adresse remise de clés" : "Adresse récupération véhicule";
+                    const placeholder = kind === "pickup" ? "ex : 12 Rue de la Paix, Toulouse" : "ex : Parking Jean Jaurès, Toulouse";
+                    const filtered = savedAddresses.filter((a) =>
+                      value.trim().length === 0 || a.label.toLowerCase().includes(value.toLowerCase())
+                    );
+                    return (
+                      <div key={kind} className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>{label}</label>
+                        <input
+                          type="text"
+                          list={`addr-list-${kind}`}
+                          placeholder={placeholder}
+                          value={value}
+                          onChange={(e) => setLogForm((f) => ({ ...f, [field]: e.target.value }))}
+                          style={inputStyle}
+                        />
+                        <datalist id={`addr-list-${kind}`}>
+                          {savedAddresses.map((a) => (
+                            <option key={a.id} value={a.label} />
+                          ))}
+                        </datalist>
+                        {/* Saved address chips */}
+                        {savedAddresses.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {filtered.slice(0, 8).map((addr) => (
+                              <div key={addr.id} className="flex items-center gap-0" style={{ border: "1px solid var(--border)", borderRadius: "9999px", overflow: "hidden" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setLogForm((f) => ({ ...f, [field]: addr.label }))}
+                                  style={{
+                                    fontSize: "0.72rem",
+                                    padding: "2px 8px",
+                                    background: value === addr.label ? "var(--accent)" : "var(--card-secondary)",
+                                    color: value === addr.label ? "white" : "var(--foreground)",
+                                    border: "none",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  {addr.label}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={deletingAddressId === addr.id}
+                                  onClick={() => handleDeleteAddress(addr.id)}
+                                  style={{
+                                    fontSize: "0.65rem",
+                                    padding: "2px 6px",
+                                    background: "transparent",
+                                    color: "var(--muted)",
+                                    border: "none",
+                                    borderLeft: "1px solid var(--border)",
+                                    cursor: "pointer",
+                                  }}
+                                  title="Supprimer cette adresse"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Agency brand */}

@@ -13,6 +13,8 @@ export type BookingItem = {
   agency: AgencyBrand;
   startAtIso?: string;
   endAtIso?: string;
+  customerPhone?: string | null;
+  notes?: string | null;
 };
 
 export type VehicleOperationalStatus =

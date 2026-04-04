@@ -152,13 +152,16 @@ export function serializeStatusLogMission(row: StatusLogRow): {
   const dateShort = `${String(startsAt.getDate()).padStart(2, "0")}/${String(startsAt.getMonth() + 1).padStart(2, "0")}`;
   const missionLabel = `${operation} · ${row.vehicle.model} · ${plateShort} · ${dateShort}`;
 
+  const pickupLoc = row.pickupAddress?.trim() || "Backoffice";
+  const returnLoc = row.returnAddress?.trim() || "Backoffice";
+
   const booking: BookingItem = {
     id: `log-${row.id}`,
     date: toIsoDate(startsAt),
     type,
     client: row.customerName ?? "Client",
-    pickup: `Backoffice / ${toHourLabel(startsAt)}`,
-    dropoff: endsAt ? `Backoffice / ${toHourLabel(endsAt)}` : "Backoffice / —",
+    pickup: `${pickupLoc} / ${toHourLabel(startsAt)}`,
+    dropoff: endsAt ? `${returnLoc} / ${toHourLabel(endsAt)}` : `${returnLoc} / —`,
     dropoffDate: endsAt ? toIsoDate(endsAt) : toIsoDate(startsAt),
     car: row.vehicle.model,
     plateNumber: row.vehicle.plateNumber,
@@ -167,6 +170,8 @@ export function serializeStatusLogMission(row: StatusLogRow): {
     agency: row.vehicle.agency.brand,
     startAtIso: startsAt.toISOString(),
     endAtIso: endsAt?.toISOString(),
+    customerPhone: row.customerPhone ?? null,
+    notes: row.notes ?? null,
   };
 
   const assignedName = row.assignedOperatorName ?? null;
