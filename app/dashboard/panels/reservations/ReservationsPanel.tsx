@@ -458,7 +458,7 @@ export function ReservationsPanel({
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="text-base font-medium">
-                          {booking.pickup} / {booking.client}
+                          {booking.type === "PICKUP" ? booking.pickup : booking.dropoff} / {booking.client}
                         </p>
                         <p className="text-sm text-muted">
                           {booking.car} - {bookingRefLabel(booking)}
@@ -553,7 +553,7 @@ export function ReservationsPanel({
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="text-base font-medium">
-                          {booking.pickup} / {booking.client}
+                          {booking.type === "PICKUP" ? booking.pickup : booking.dropoff} / {booking.client}
                         </p>
                         <p className="mt-0.5 text-sm text-muted">
                           {booking.car} - {bookingRefLabel(booking)}
