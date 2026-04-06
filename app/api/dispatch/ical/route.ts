@@ -54,7 +54,9 @@ export async function GET(request: Request) {
       calendarName: `Dispatch ${employee.name}`,
       events: employee.events.map((event) => ({
         uid: `${event.dispatchRef}-${employee.slug}@citron-erp`,
-        title: `${operationLabel(event.operationType)} · ${event.customerName}`,
+        title: event.customerPhone
+          ? `${operationLabel(event.operationType)} · ${event.customerName} · ${event.customerPhone}`
+          : `${operationLabel(event.operationType)} · ${event.customerName}`,
         description: buildIcalDescription({
           reservationRef: event.reservationRef,
           missionLabel: event.missionLabel,

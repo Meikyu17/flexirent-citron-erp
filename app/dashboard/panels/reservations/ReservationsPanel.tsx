@@ -118,6 +118,8 @@ function sortAndGroup(bookings: BookingItem[], now: Date): { date: string; items
   const sorted = [...bookings].sort((a, b) => {
     const diff = bookingDisplayDate(a, now).getTime() - bookingDisplayDate(b, now).getTime();
     if (diff !== 0) return diff;
+    const timeDiff = bookingStartDate(a).getTime() - bookingStartDate(b).getTime();
+    if (timeDiff !== 0) return timeDiff;
     return a.client.localeCompare(b.client, "fr");
   });
 

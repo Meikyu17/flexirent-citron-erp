@@ -44,6 +44,7 @@ type BackofficeReservationLog = {
   startsAt: string | null;
   endsAt: string | null;
   customerName: string | null;
+  customerPhone: string | null;
   agencyBrand: AgencyBrand;
   platform: "GETAROUND" | "FLEETEE" | "TURO" | "DIRECT" | null;
   pickupAddress: string | null;
@@ -110,6 +111,7 @@ function mapBackofficeLogToBooking(log: BackofficeReservationLog): BookingItem |
     agency: log.agencyBrand,
     startAtIso: start.toISOString(),
     endAtIso: end?.toISOString(),
+    customerPhone: log.customerPhone ?? null,
   };
 }
 
