@@ -23,6 +23,7 @@ const bookingSchema = z.object({
   car: z.string().min(1),
   plateNumber: z.string().min(1),
   amount: z.number(),
+  customerPhone: z.string().nullable().optional(),
   source: z.enum(["Fleetee A", "Fleetee B", "Getaround", "Turo", "Direct"]),
   agency: z.enum(["CITRON_LOCATION", "FLEXIRENT"]),
 });
